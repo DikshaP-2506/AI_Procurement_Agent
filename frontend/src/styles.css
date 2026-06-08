@@ -1,3 +1,10 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0A0A0F; color: #F1F5F9; font-family: system-ui, -apple-system, sans-serif; }
+input, select, textarea { background: #0A0A0F; color: #F1F5F9; border: 1px solid #1F1F2E; border-radius: 8px; padding: 9px 12px; width: 100%; font-size: 14px; outline: none; transition: border-color 0.2s; }
+input:focus, select:focus { border-color: #3B82F6; }
+button { cursor: pointer; font-family: inherit; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: #1F1F2E; border-radius: 3px; }
 :root {
   font-family: Inter, system-ui, sans-serif;
   color: #f5f7fb;

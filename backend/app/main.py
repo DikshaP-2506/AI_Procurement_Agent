@@ -1,22 +1,54 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="AI Procurement Agent API")
+app = FastAPI(
+    title="Procurement AI API",
+    description="Backend for AI-driven Procurement Agent",
+    version="1.0.0"
+)
 
+# Enable CORS (Cross-Origin Resource Sharing)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],  # In production, specify actual frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+from .supabase_client import supabase
 
 @app.get("/")
-async def root() -> dict[str, str]:
-    return {"message": "AI Procurement Agent API"}
+async def root():
+    """Health check endpoint to verify the backend is running."""
+    return {
+        "message": "Procurement AI Backend Running",
+        "status": "healthy"
+    }
 
+@app.get("/test-supabase")
+async def test_supabase():
+    """Test endpoint to verify Supabase connectivity and query vendors."""
+    try:
+        # Querying the 'vendors' table
+        response = supabase.table("vendors").select("*").execute()
+        
+        return {
+            "status": "success",
+            "data": response.data
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+# Include routers
+from .routes import vendors
+app.include_router(vendors.router)
+from .routes import quote_routes
+app.include_router(quote_routes.router)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
