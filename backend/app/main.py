@@ -48,6 +48,8 @@ from .routes import vendors
 app.include_router(vendors.router)
 from .routes import quote_routes
 app.include_router(quote_routes.router)
+from .routes import optimization_routes
+app.include_router(optimization_routes.router)
 
 if __name__ == "__main__":
     import uvicorn

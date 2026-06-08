@@ -5,3 +5,5 @@ python-dotenv
 email-validator
 python-multipart
 pymupdf
+langchain
+langchain-groq

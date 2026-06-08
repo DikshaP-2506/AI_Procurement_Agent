@@ -1,0 +1,68 @@
+from typing import Dict, Any
+from ..agents.strategic_agent import generate_strategic_analysis
+from .audit_service import log_agent_execution
+
+
+async def analyze_strategic_opportunities(
+    renewal_data: Dict[str, Any],
+    crossdeal_data: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Orchestrate strategic procurement analysis.
+    
+    Consumes outputs from:
+    - Subscription Renewal Catcher (renewal_data)
+    - Cross Deal Negotiator (crossdeal_data)
+    
+    Returns strategic recommendations combining both analyses.
+    
+    Args:
+        renewal_data: Output from GET /optimization/renewal-analysis
+        crossdeal_data: Output from GET /optimization/crossdeal-analysis
+    
+    Returns:
+        Strategic analysis with actions, savings, priority, impact, and reasoning
+    """
+    try:
+        # Pass both analyses to the strategic agent
+        strategic_result = generate_strategic_analysis(renewal_data, crossdeal_data)
+        
+        result = {
+            "status": "success",
+            "strategic_analysis": strategic_result,
+            "input_summary": {
+                "renewal_contracts_analyzed": renewal_data.get("total_contracts", 0),
+                "high_risk_contracts": renewal_data.get("high_risk_count", 0),
+                "vendors_with_opportunities": crossdeal_data.get("vendors_with_opportunities", 0),
+                "total_potential_savings_from_crossdeal": crossdeal_data.get("total_estimated_savings", 0)
+            }
+        }
+        
+        # Log agent execution
+        await log_agent_execution(
+            agent_name="Strategic Procurement Agent",
+            action_type="strategic_analysis",
+            input_payload={
+                "renewal_summary": {
+                    "total_contracts": renewal_data.get("total_contracts", 0),
+                    "high_risk_count": renewal_data.get("high_risk_count", 0),
+                    "medium_risk_count": renewal_data.get("medium_risk_count", 0)
+                },
+                "crossdeal_summary": {
+                    "vendors_analyzed": crossdeal_data.get("total_vendors_analyzed", 0),
+                    "vendors_with_opportunities": crossdeal_data.get("vendors_with_opportunities", 0),
+                    "total_estimated_savings": crossdeal_data.get("total_estimated_savings", 0)
+                }
+            },
+            output_payload={
+                "strategic_actions": strategic_result.get("strategic_actions", []),
+                "estimated_savings": strategic_result.get("estimated_savings", "$0"),
+                "priority": strategic_result.get("priority", "LOW"),
+                "business_impact": strategic_result.get("business_impact", "")
+            },
+            reasoning="Synthesized renewal risks and cross-deal opportunities to generate strategic procurement recommendations for vendor consolidation and cost optimization."
+        )
+        
+        return result
+    except Exception as e:
+        raise Exception(f"Failed to analyze strategic opportunities: {str(e)}")
