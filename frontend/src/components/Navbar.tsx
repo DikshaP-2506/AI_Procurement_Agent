@@ -23,6 +23,9 @@ export default function Navbar() {
           <NavLink to="/upload" className={({ isActive }) => linkClass(isActive)}>
             Upload Quote
           </NavLink>
+          <NavLink to="/risk" className={({ isActive }) => linkClass(isActive)}>
+            Risk
+          </NavLink>
         </div>
       </div>
     </nav>

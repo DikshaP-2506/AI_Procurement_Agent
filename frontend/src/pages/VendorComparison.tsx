@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Vendor, VendorQuote } from '../types/vendor';
 import { getVendors, getVendorQuotes } from '../api/vendorApi';
 import Navbar from '../components/Navbar';
@@ -42,13 +43,14 @@ export default function VendorComparison() {
                 <th style={{ padding: 12 }}>Warranty</th>
                 <th style={{ padding: 12 }}>Support</th>
                 <th style={{ padding: 12 }}>Compliance</th>
+                <th style={{ padding: 12 }}>Risk</th>
               </tr>
             </thead>
             <tbody>
               {vendors.map(v => {
                 const q = quotesMap[v.id] && quotesMap[v.id][0];
                 if (!q) return (
-                  <tr key={v.id}><td colSpan={6} style={{ padding: 12 }}>No quotes for {v.vendor_name}</td></tr>
+                  <tr key={v.id}><td colSpan={7} style={{ padding: 12 }}>No quotes for {v.vendor_name}</td></tr>
                 );
                 const scoreColor = q.compliance_score >= 80 ? '#10B981' : q.compliance_score >= 60 ? '#F59E0B' : '#F87171';
                 return (
@@ -59,6 +61,7 @@ export default function VendorComparison() {
                     <td style={{ padding: 12 }}>{q.warranty_years} yrs</td>
                     <td style={{ padding: 12 }}>{q.support_level}</td>
                     <td style={{ padding: 12, color: scoreColor }}>{q.compliance_score}</td>
+                    <td style={{ padding: 12 }}><Link to={`/risk/${v.id}`} style={{ color: '#60A5FA', textDecoration: 'none' }}>Open</Link></td>
                   </tr>
                 );
               })}

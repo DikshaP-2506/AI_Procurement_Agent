@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Vendor, VendorCreate } from '../types/vendor';
 import { createVendor, getVendors } from '../api/vendorApi';
 import Navbar from '../components/Navbar';
@@ -74,7 +75,10 @@ export default function VendorManagement() {
                   <div key={v.id} style={{ background: '#111118', border: '1px solid #1F1F2E', padding: 12, borderRadius: 8, marginBottom: 8 }}>
                     <div style={{ color: '#FFFFFF', fontWeight: 700 }}>{v.vendor_name}</div>
                     <div style={{ color: '#6B7280', fontSize: 13 }}>{v.contact_person} • {v.email}</div>
-                    <div style={{ display: 'inline-block', marginTop: 8, background: '#1A2744', color: '#60A5FA', padding: '4px 8px', borderRadius: 6 }}>{v.country}</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'inline-block', background: '#1A2744', color: '#60A5FA', padding: '4px 8px', borderRadius: 6 }}>{v.country}</div>
+                      <Link to={`/risk/${v.id}`} style={{ color: '#34D399', fontSize: 13, textDecoration: 'none' }}>View Risk</Link>
+                    </div>
                   </div>
                 ))
               )}

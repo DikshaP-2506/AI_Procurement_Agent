@@ -52,6 +52,8 @@ from .routes import optimization_routes
 app.include_router(optimization_routes.router)
 from .routes import negotiation_routes
 app.include_router(negotiation_routes.router)
+from .routes import risk_routes
+app.include_router(risk_routes.router)
 
 if __name__ == "__main__":
     import uvicorn

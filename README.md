@@ -27,3 +27,12 @@ uvicorn app.main:app --reload --port 8000
 
 - Health check: `GET http://localhost:8000/health`
 - Root: `GET http://localhost:8000/`
+
+## Risk Intelligence
+
+- Existing Supabase table: `vendor_risk_analysis`
+- API routes:
+	- `GET /risk/vendor/{vendor_id}`
+	- `GET /risk/history/{vendor_id}`
+	- `GET /risk/dashboard`
+	- `POST /risk/analyze`
