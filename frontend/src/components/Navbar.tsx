@@ -1,32 +1,80 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-const linkClass = (isActive: boolean) =>
-  `px-3 py-2 text-sm ${isActive ? 'text-[#F1F5F9] border-b-2 border-[#3B82F6]' : 'text-[#6B7280] hover:text-[#F1F5F9] transition-colors'}`;
-
 export default function Navbar() {
+  const linkStyle = (isActive: boolean) => ({
+    padding: '8px 16px',
+    fontSize: '14px',
+    fontWeight: 600,
+    textDecoration: 'none',
+    color: isActive ? '#FFFFFF' : '#94A3B8',
+    borderBottom: isActive ? '2px solid #3B82F6' : '2px solid transparent',
+    transition: 'all 0.2s ease',
+    display: 'inline-flex',
+    alignItems: 'center',
+    height: '100%'
+  });
+
   return (
-    <nav style={{ background: '#0D0D14', height: 56, borderBottom: '1px solid #1F1F2E', position: 'fixed', top: 0, width: '100%', zIndex: 100 }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 8, height: 8, background: '#3B82F6', borderRadius: 4 }} />
-          <div style={{ color: '#FFFFFF', fontWeight: 700 }}>ProcureAI</div>
+    <nav style={{ 
+      background: 'rgba(8, 10, 20, 0.75)', 
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
+      height: 60, 
+      borderBottom: '1px solid rgba(255, 255, 255, 0.08)', 
+      position: 'fixed', 
+      top: 0, 
+      width: '100%', 
+      zIndex: 100 
+    }}>
+      <div style={{ 
+        maxWidth: 1200, 
+        margin: '0 auto', 
+        height: '100%', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        padding: '0 20px' 
+      }}>
+        
+        {/* Brand Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ 
+            width: 10, 
+            height: 10, 
+            background: 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)', 
+            borderRadius: '50%',
+            boxShadow: '0 0 10px rgba(59, 130, 246, 0.8)' 
+          }} />
+          <div style={{ 
+            color: '#FFFFFF', 
+            fontWeight: 800, 
+            fontSize: '18px', 
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(90deg, #FFFFFF 50%, #94A3B8 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
+            ProcureAI
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <NavLink to="/" className={({ isActive }) => linkClass(isActive)}>
+        {/* Links Navigation */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', height: '100%' }}>
+          <NavLink to="/" style={({ isActive }) => linkStyle(isActive)}>
             Vendors
           </NavLink>
-          <NavLink to="/comparison" className={({ isActive }) => linkClass(isActive)}>
+          <NavLink to="/comparison" style={({ isActive }) => linkStyle(isActive)}>
             Compare
           </NavLink>
-          <NavLink to="/upload" className={({ isActive }) => linkClass(isActive)}>
+          <NavLink to="/upload" style={({ isActive }) => linkStyle(isActive)}>
             Upload Quote
           </NavLink>
-          <NavLink to="/risk" className={({ isActive }) => linkClass(isActive)}>
-            Risk
+          <NavLink to="/risk" style={({ isActive }) => linkStyle(isActive)}>
+            Risk Dashboard
           </NavLink>
         </div>
+
       </div>
     </nav>
   );

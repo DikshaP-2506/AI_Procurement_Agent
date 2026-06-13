@@ -24,33 +24,43 @@ export default function RiskTrendVisualization({ trend }: { trend: RiskTrendPoin
     .join(' ');
 
   return (
-    <div style={{ background: '#111118', border: '1px solid #1F1F2E', borderRadius: 16, padding: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h3 style={{ margin: 0, fontSize: 16 }}>Risk Trend</h3>
-        <span style={{ color: '#94A3B8', fontSize: 12 }}>{points.length} snapshots</span>
+    <div className="card-glass">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>Risk Trend</h3>
+        <span style={{ color: '#94A3B8', fontSize: 12, background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: 4 }}>
+          {points.length} snapshots
+        </span>
       </div>
       {points.length === 0 ? (
-        <div style={{ color: '#94A3B8' }}>No trend data yet. Run an analysis to generate history.</div>
+        <div style={{ color: '#94A3B8', fontSize: 13.5 }}>No trend data yet. Run an analysis to generate history.</div>
       ) : (
         <>
-          <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="220" role="img" aria-label="Risk trend chart">
-            <defs>
-              <linearGradient id="riskTrendStroke" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#60A5FA" />
-                <stop offset="100%" stopColor="#A78BFA" />
-              </linearGradient>
-            </defs>
-            <path d={path} fill="none" stroke="url(#riskTrendStroke)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            {points.map((point, index) => {
-              const x = index * step;
-              const y = height - (point.final_risk_score / max) * (height - 24) - 8;
-              return <circle key={`${point.created_at}-${index}`} cx={x} cy={y} r="5" fill={colorForLevel(point.final_risk_level)} />;
-            })}
-          </svg>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8, color: '#94A3B8', fontSize: 12 }}>
-            <span>High risk = red</span>
-            <span>Medium risk = amber</span>
-            <span>Low risk = green</span>
+          <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.04)', overflow: 'hidden' }}>
+            <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="220" role="img" aria-label="Risk trend chart">
+              <defs>
+                <linearGradient id="riskTrendStroke" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#3B82F6" />
+                  <stop offset="100%" stopColor="#8B5CF6" />
+                </linearGradient>
+              </defs>
+              <path d={path} fill="none" stroke="url(#riskTrendStroke)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              {points.map((point, index) => {
+                const x = index * step;
+                const y = height - (point.final_risk_score / max) * (height - 24) - 8;
+                return <circle key={`${point.created_at}-${index}`} cx={x} cy={y} r="5" fill={colorForLevel(point.final_risk_level)} stroke="rgba(0,0,0,0.5)" strokeWidth="1.5" />;
+              })}
+            </svg>
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 14, color: '#94A3B8', fontSize: 12, justifyContent: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', display: 'inline-block' }} /> High Risk
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} /> Medium Risk
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} /> Low Risk
+            </span>
           </div>
         </>
       )}

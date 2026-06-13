@@ -38,12 +38,11 @@ def main() -> None:
     for vendor in vendors[:5]:
         payload = {
             "vendor_id": vendor["id"],
-            "vendor_name": vendor.get("vendor_name"),
-            "historical_score": 88,
-            "on_time_delivery_rate": 92,
-            "sla_compliance": 95,
-            "past_projects": 15,
-            "risk_score": 72,
+            "market_risk_score": 72,
+            "financial_risk_score": 12,
+            "supply_chain_risk_score": 8,
+            "legal_risk_score": 5,
+            "overall_risk_score": 61,
             "risk_level": "medium",
             "alerts": [
                 {
@@ -53,18 +52,13 @@ def main() -> None:
                     "source": "seed_script",
                 }
             ],
-            "market_signals": [],
-            "delay_probability": 0.18,
-            "delay_risk": "low",
-            "prediction_reason": "Seeded risk snapshot for demo data.",
-            "final_risk_score": 61,
-            "final_risk_level": "medium",
-            "risk_breakdown": {
-                "historical": {"historical_score": 88},
-                "market": {"risk_score": 72},
-                "delay": {"delay_probability": 0.18},
-            },
-            "analysis_version": "seed-v1",
+            "source_links": [
+                {
+                    "source": "seed_script",
+                    "label": "market_watch",
+                    "message": "Sample market risk alert for validation.",
+                }
+            ]
         }
         client.table("vendor_risk_analysis").insert(payload).execute()
         print(f"Seeded risk snapshot for {vendor.get('vendor_name')}")
