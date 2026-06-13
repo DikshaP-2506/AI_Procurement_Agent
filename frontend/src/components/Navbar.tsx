@@ -76,6 +76,9 @@ export default function Navbar() {
           <NavLink to="/optimization" style={({ isActive }) => linkStyle(isActive)}>
             Optimization
           </NavLink>
+          <NavLink to="/negotiation" style={({ isActive }) => linkStyle(isActive)}>
+            Negotiation Intelligence
+          </NavLink>
         </div>
 
       </div>
