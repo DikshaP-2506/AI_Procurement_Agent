@@ -1,4 +1,5 @@
 from typing import List, Dict, Any
+import json
 from ..supabase_client import supabase, supabase_service
 from ..agents.negotiation_agent import (
     generate_negotiation_strategy,
@@ -159,7 +160,7 @@ async def generate_strategy(vendor_name: str, product_category: str, quote_value
                     "cleaned_response": trace.get("cleaned_response", ""),
                     "fallback_reason": trace.get("fallback_reason", ""),
                 },
-                output_payload=result.model_dump(),
+                output_payload=json.loads(result.model_dump_json()),
                 reasoning=f"Fallback strategy used because {trace.get('fallback_reason', 'the model response was invalid')}.",
             )
 
@@ -174,7 +175,7 @@ async def generate_strategy(vendor_name: str, product_category: str, quote_value
                 "retrieved_records_count": len(historical),
                 "top_strategy_candidates": _build_strategy_candidates(historical)
             },
-            output_payload=result.model_dump(),
+            output_payload=json.loads(result.model_dump_json()),
             reasoning="Generated negotiation strategy based on structured historical negotiation patterns."
         )
 

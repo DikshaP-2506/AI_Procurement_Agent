@@ -7,8 +7,27 @@ import requests
 import json
 import sys
 
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+# Load environment variables
+BACKEND_ENV_PATH = Path(__file__).resolve().parent / "backend" / ".env"
+load_dotenv(dotenv_path=BACKEND_ENV_PATH)
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Fetch an active procurement
+proc_resp = supabase.table("procurements").select("id").eq("status", "active").limit(1).execute()
+if proc_resp.data:
+    PROCUREMENT_ID = proc_resp.data[0]["id"]
+else:
+    PROCUREMENT_ID = "8ea2d01d-2137-4e83-8875-eb6a28d6e0c6" # Fallback
+
 BASE_URL = "http://localhost:8000"
-PROCUREMENT_ID = "8ea2d01d-2137-4e83-8875-eb6a28d6e0c6"
 
 def test_recommendation_endpoint():
     print("\n" + "="*60)

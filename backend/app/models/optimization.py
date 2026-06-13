@@ -25,10 +25,11 @@ class RenewalRiskAnalysis(BaseModel):
     contract_id: str
     contract_name: str
     vendor_name: str
-    renewal_date: date
-    days_remaining: int
-    risk_level: Literal["HIGH", "MEDIUM", "LOW"]
+    renewal_date: Optional[date] = None
+    days_remaining: Optional[int] = None
+    risk_level: Literal["HIGH", "MEDIUM", "LOW", "CRITICAL", "UNKNOWN"]
     recommendation: str
+    explainability: str = Field(default="", description="Detailed reason for the risk assessment and recommendation")
 
     class Config:
         from_attributes = True
@@ -69,6 +70,7 @@ class DealOpportunity(BaseModel):
     estimated_savings_percent: int = Field(description="Estimated savings percentage")
     estimated_savings_amount: float = Field(description="Estimated savings in currency")
     recommendation: str
+    confidence_score: float = Field(default=85.0, description="Confidence score from 0 to 100")
 
     class Config:
         from_attributes = True
@@ -103,9 +105,14 @@ class StrategicAnalysis(BaseModel):
     """Strategic procurement analysis output."""
     strategic_actions: List[str] = Field(description="List of strategic procurement recommendations")
     estimated_savings: str = Field(description="Estimated strategic savings in currency format")
+    expected_savings: float = Field(default=0.0, description="Estimated savings as a number for frontend")
     priority: Literal["HIGH", "MEDIUM", "LOW"] = Field(description="Overall priority level")
     business_impact: str = Field(description="Expected business impact of the recommendations")
     reasoning: str = Field(description="Reasoning behind the strategic recommendations")
+    current_vendors: int = Field(default=0, description="Total current vendor count")
+    recommended_vendors: int = Field(default=0, description="Recommended vendor count after consolidation")
+    reduction_percent: float = Field(default=0.0, description="Percentage reduction in vendor count")
+    confidence_score: float = Field(default=90.0, description="Strategic confidence score")
 
     class Config:
         from_attributes = True
@@ -129,8 +136,8 @@ class RenewalAlert(BaseModel):
     """Renewal alert for the summary."""
     vendor_name: str
     contract_name: str
-    days_remaining: int
-    risk_level: Literal["HIGH", "MEDIUM", "LOW"]
+    days_remaining: Optional[int] = None
+    risk_level: Literal["HIGH", "MEDIUM", "LOW", "CRITICAL", "UNKNOWN"]
     recommendation: str
 
 

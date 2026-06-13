@@ -136,13 +136,47 @@ async def strategic_analysis(request: StrategicAnalysisRequest):
         
         return StrategicAnalysisResponse(
             status=result["status"],
-            strategic_analysis={
-                "strategic_actions": result["strategic_analysis"]["strategic_actions"],
-                "estimated_savings": result["strategic_analysis"]["estimated_savings"],
-                "priority": result["strategic_analysis"]["priority"],
-                "business_impact": result["strategic_analysis"]["business_impact"],
-                "reasoning": result["strategic_analysis"]["reasoning"]
-            },
+            strategic_analysis=result["strategic_analysis"],
+            input_summary=result["input_summary"]
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to perform strategic analysis: {str(e)}"
+        )
+
+
+@router.get("/strategic-analysis", response_model=StrategicAnalysisResponse)
+async def get_strategic_analysis():
+    """
+    Get strategic procurement recommendations (GET wrapper for the dashboard).
+    """
+    try:
+        analyses, summary_dict = await get_renewal_analysis()
+        renewal_data = {
+            "total_contracts": summary_dict["total_contracts"],
+            "high_risk_count": summary_dict["high_risk_count"],
+            "medium_risk_count": summary_dict["medium_risk_count"],
+            "low_risk_count": summary_dict["low_risk_count"],
+            "contracts": [c.model_dump() for c in analyses] if analyses else []
+        }
+        
+        opportunities, crossdeal_summary_dict = await get_crossdeal_analysis()
+        crossdeal_data = {
+            "total_vendors_analyzed": crossdeal_summary_dict["total_vendors_analyzed"],
+            "vendors_with_opportunities": crossdeal_summary_dict["vendors_with_opportunities"],
+            "total_estimated_savings": crossdeal_summary_dict["total_estimated_savings"],
+            "opportunities": [o.model_dump() for o in opportunities] if opportunities else []
+        }
+
+        result = await analyze_strategic_opportunities(
+            renewal_data,
+            crossdeal_data
+        )
+        
+        return StrategicAnalysisResponse(
+            status=result["status"],
+            strategic_analysis=result["strategic_analysis"],
             input_summary=result["input_summary"]
         )
     except Exception as e:

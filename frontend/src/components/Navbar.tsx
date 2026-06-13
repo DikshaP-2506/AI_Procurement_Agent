@@ -73,6 +73,9 @@ export default function Navbar() {
           <NavLink to="/risk" style={({ isActive }) => linkStyle(isActive)}>
             Risk Dashboard
           </NavLink>
+          <NavLink to="/optimization" style={({ isActive }) => linkStyle(isActive)}>
+            Optimization
+          </NavLink>
         </div>
 
       </div>

@@ -94,7 +94,7 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
             comparison_summary="No active quotes found for the compared vendors. Please upload quotes to run the simulator."
         )
 
-    # 4. Fetch risk profiles
+    # 4. Fetch risk profiles & run optimization analysis
     vendor_risk_map: Dict[str, int] = {}
     for v in active_vendors:
         v_id = v["id"]
@@ -105,12 +105,45 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
             logger.warning(f"Failed to fetch risk score for vendor {v_id}, defaulting to 50: {e}")
             vendor_risk_map[v_id] = 50
 
-    # 5. Extract metrics for normalization
-    prices = [float(vendor_quotes_map[v["id"]].get("price", 0) or 0) for v in active_vendors]
-    delivery_times = [float(vendor_quotes_map[v["id"]].get("delivery_days", 0) or 0) for v in active_vendors]
+    # Retrieve optimization data to influence the final recommendation
+    try:
+        from .renewal_service import get_renewal_analysis
+        from .crossdeal_service import get_crossdeal_analysis
+        renewal_analyses, _ = await get_renewal_analysis()
+        crossdeal_opportunities, _ = await get_crossdeal_analysis()
+    except Exception as e:
+        logger.warning(f"Failed to fetch optimization data for recommendation pipeline: {e}")
+        renewal_analyses, crossdeal_opportunities = [], []
+
+    def is_vendor_match(name1: str, name2: str) -> bool:
+        n1 = str(name1 or "").lower().strip()
+        n2 = str(name2 or "").lower().strip()
+        return n1 in n2 or n2 in n1
+
+    # 5. Extract metrics for normalization (applying cross-deal discounts to pricing for scoring influence)
+    prices_for_scoring = []
+    prices_raw = []
+    delivery_times = []
     
-    min_price = min(prices) if prices else 0.0
-    max_price = max(prices) if prices else 0.0
+    for v in active_vendors:
+        v_id = v["id"]
+        v_name = v["vendor_name"]
+        quote = vendor_quotes_map[v_id]
+        
+        raw_price = float(quote.get("price", 0) or 0)
+        prices_raw.append(raw_price)
+        
+        # Apply cross-deal bundling discount if opportunity exists
+        discount = 0.0
+        for opp in crossdeal_opportunities:
+            if is_vendor_match(v_name, opp.vendor_name):
+                discount = opp.estimated_savings_percent / 100.0
+                break
+        
+        prices_for_scoring.append(raw_price * (1.0 - discount))
+        delivery_times.append(float(quote.get("delivery_days", 0) or 0))
+    
+    min_price_for_scoring = min(prices_for_scoring) if prices_for_scoring else 0.0
     min_delivery = min(delivery_times) if delivery_times else 0.0
     max_delivery = max(delivery_times) if delivery_times else 0.0
 
@@ -123,7 +156,6 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
     w_total = w_cost + w_risk + w_support + w_delivery
     warning_msg = None
     if w_total == 0:
-        # Default to equal weights to prevent division by zero
         w_cost = w_risk = w_support = w_delivery = 25.0
         w_total = 100.0
         warning_msg = "All weights were set to 0. Internally defaulted to equal weights (25% each)."
@@ -139,17 +171,46 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
         qual_adj = float(qual_adjustments.get(v_id, 0.0))
         qual_adj = max(-20.0, min(20.0, qual_adj)) # Clamped
 
-        # Calculate scores
-        # Cost Score (Ratio-based: min_price / price, higher is better)
+        # Match optimization inputs
+        matching_crossdeal = None
+        for opp in crossdeal_opportunities:
+            if is_vendor_match(v_name, opp.vendor_name):
+                matching_crossdeal = opp
+                break
+                
+        matching_renewals = [ren for ren in renewal_analyses if is_vendor_match(v_name, ren.vendor_name)]
+
+        # Cost Score (Ratio-based using effective/scoring price)
         raw_price = float(quote.get("price", 0) or 0)
-        if raw_price > 0:
-            cost_score = 100.0 * (min_price / raw_price)
+        crossdeal_discount = (matching_crossdeal.estimated_savings_percent / 100.0) if matching_crossdeal else 0.0
+        price_for_scoring = raw_price * (1.0 - crossdeal_discount)
+        
+        if price_for_scoring > 0:
+            cost_score = 100.0 * (min_price_for_scoring / price_for_scoring)
         else:
             cost_score = 100.0
             
         # Risk Score (Safety score = 100 - risk_score, higher is safer/better)
         raw_risk = float(vendor_risk_map.get(v_id, 50))
-        risk_score = max(0.0, min(100.0, 100.0 - raw_risk))
+        
+        # Apply Renewal Risk penalties to raw risk
+        risk_penalty = 0.0
+        highest_renewal_risk = "LOW"
+        for ren in matching_renewals:
+            if ren.risk_level == "CRITICAL":
+                risk_penalty = max(risk_penalty, 20.0)
+                highest_renewal_risk = "CRITICAL"
+            elif ren.risk_level == "HIGH":
+                risk_penalty = max(risk_penalty, 15.0)
+                if highest_renewal_risk != "CRITICAL":
+                    highest_renewal_risk = "HIGH"
+            elif ren.risk_level == "MEDIUM":
+                risk_penalty = max(risk_penalty, 8.0)
+                if highest_renewal_risk not in ["CRITICAL", "HIGH"]:
+                    highest_renewal_risk = "MEDIUM"
+                    
+        effective_risk = min(100.0, raw_risk + risk_penalty)
+        risk_score = max(0.0, min(100.0, 100.0 - effective_risk))
         
         # Support Score (Mapped from string)
         raw_support = quote.get("support_level", "Basic")
@@ -169,7 +230,11 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
         delivery_contrib = (delivery_score * w_delivery) / w_total
         
         base_score = cost_contrib + risk_contrib + support_contrib + delivery_contrib
-        final_score = round(max(0.0, min(100.0, base_score + qual_adj)), 1)
+        
+        # Add Strategic Consolidation bonus (+5.0 points to final score if cross-deal bundling opportunity exists)
+        strategic_bonus = 5.0 if matching_crossdeal else 0.0
+        
+        final_score = round(max(0.0, min(100.0, base_score + qual_adj + strategic_bonus)), 1)
         
         # Single vendor explanation
         single_expl = (
@@ -179,6 +244,10 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
             f"Support rating is {support_score:.1f}/100 (level: {raw_support}), "
             f"Delivery rating is {delivery_score:.1f}/100 (delivery: {raw_delivery:.0f} days)."
         )
+        if matching_crossdeal:
+            single_expl += f" [CROSS DEAL] Influenced by Cross-Deal Negotiator: bundling potential across {len(matching_crossdeal.departments)} departments unlocks {matching_crossdeal.estimated_savings_percent}% estimated savings (added +5.0 strategic consolidation bonus)."
+        if highest_renewal_risk in ["CRITICAL", "HIGH", "MEDIUM"]:
+            single_expl += f" [RENEWAL RISK] Flagged by Renewal Catcher: active contract has {highest_renewal_risk} renewal risk (applied {risk_penalty:.0f}-point risk safety penalty)."
         if qual_adj != 0:
             single_expl += f" Includes a qualitative adjustment of {qual_adj:+.1f}."
 

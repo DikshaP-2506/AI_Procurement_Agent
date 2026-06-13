@@ -5,6 +5,7 @@ import VendorComparison from './pages/VendorComparison';
 import QuoteUpload from './pages/QuoteUpload';
 import RiskDashboard from './pages/RiskDashboard';
 import VendorRiskOverview from './pages/VendorRiskOverview';
+import OptimizationDashboard from "./pages/OptimizationDashboard";
 import './styles.css';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/upload" element={<QuoteUpload />} />
           <Route path="/risk" element={<RiskDashboard />} />
           <Route path="/risk/:vendorId" element={<VendorRiskOverview />} />
+          <Route path="/optimization" element={<OptimizationDashboard />} />
         </Routes>
       </BrowserRouter>
     </div>

@@ -40,10 +40,10 @@ async def get_optimization_summary() -> Dict[str, Any]:
         strategic_result = await analyze_strategic_opportunities(renewal_data, crossdeal_data)
         strategic_analysis = strategic_result.get("strategic_analysis", {})
         
-        # Build renewal alerts (sort by HIGH, then MEDIUM, limit to top 10)
+        # Build renewal alerts (sort by CRITICAL, then HIGH, then MEDIUM, limit to top 10)
         renewal_alerts = []
         for analysis in renewal_analyses:
-            if analysis.risk_level in ["HIGH", "MEDIUM"]:
+            if analysis.risk_level in ["HIGH", "MEDIUM", "CRITICAL"]:
                 renewal_alerts.append(
                     RenewalAlert(
                         vendor_name=analysis.vendor_name,
@@ -54,11 +54,12 @@ async def get_optimization_summary() -> Dict[str, Any]:
                     )
                 )
         
-        # Sort by risk level (HIGH first) then by days remaining
-        renewal_alerts.sort(
-            key=lambda x: (x.risk_level != "HIGH", x.days_remaining),
-            reverse=False
-        )
+        # Sort by risk level (CRITICAL first, then HIGH, then MEDIUM) then by days remaining
+        def risk_sort_key(x):
+            level_rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4}
+            return (level_rank.get(x.risk_level, 4), x.days_remaining if x.days_remaining is not None else 9999)
+            
+        renewal_alerts.sort(key=risk_sort_key)
         renewal_alerts = renewal_alerts[:10]  # Top 10 alerts
         
         # Build bundle opportunities
@@ -73,14 +74,28 @@ async def get_optimization_summary() -> Dict[str, Any]:
         ]
         
         # Build strategic recommendations
-        strategic_recommendations = [
-            StrategicRecommendation(
-                action=action,
-                priority=strategic_analysis.get("priority", "MEDIUM"),
-                estimated_savings=strategic_analysis.get("estimated_savings", "$0")
+        strategic_recommendations = []
+        for action in strategic_analysis.get("strategic_actions", []):
+            if isinstance(action, dict):
+                act_str = action.get("action", str(action))
+                priority = action.get("priority", strategic_analysis.get("priority", "MEDIUM"))
+                savings = action.get("estimated_savings", strategic_analysis.get("estimated_savings", "$0"))
+            else:
+                act_str = str(action)
+                priority = strategic_analysis.get("priority", "MEDIUM")
+                savings = strategic_analysis.get("estimated_savings", "$0")
+                
+            # Clean priority value to ensure it matches standard Literals
+            if priority not in ["HIGH", "MEDIUM", "LOW"]:
+                priority = "MEDIUM"
+                
+            strategic_recommendations.append(
+                StrategicRecommendation(
+                    action=act_str,
+                    priority=priority,
+                    estimated_savings=savings
+                )
             )
-            for action in strategic_analysis.get("strategic_actions", [])
-        ]
         
         # Calculate overall impact
         high_risk_count = renewal_summary.get("high_risk_count", 0)
@@ -98,7 +113,7 @@ async def get_optimization_summary() -> Dict[str, Any]:
         
         summary = OptimizationSummary(
             total_renewal_alerts=len(renewal_alerts),
-            high_risk_count=sum(1 for a in renewal_alerts if a.risk_level == "HIGH"),
+            high_risk_count=sum(1 for a in renewal_alerts if a.risk_level in ["HIGH", "CRITICAL"]),
             renewal_alerts=renewal_alerts,
             
             total_bundle_opportunities=len(bundle_opportunities),
