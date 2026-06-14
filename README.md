@@ -92,27 +92,25 @@ The web application will launch locally at `http://localhost:5173`.
 Below are placeholders for the 8 core screens and features of the application. You can paste your screenshots directly over each comment block:
 
 ### 1. Dashboard Overview
-<!-- PASTE SCREENSHOT 1: DASHBOARD OVERVIEW HERE -->
 <img width="1451" height="837" alt="image" src="https://github.com/user-attachments/assets/50e9c4a8-dd23-4a26-8a5b-b098d2689774" />
 
-### 2. Decision Simulator & Comparison Engine
-<!-- PASTE SCREENSHOT 2: COMPARISON SIMULATOR HERE -->
+### 2. Quote Intelligence 
+<img width="960" height="532" alt="image" src="https://github.com/user-attachments/assets/8695bca4-0b68-4cf0-b94a-8f3908fad2ba" />
 
-### 3. Risk Intelligence Overview
-<!-- PASTE SCREENSHOT 3: RISK INTELLIGENCE SNAPSHOT HERE -->
+### 3. Decision Simulator & Comparison Engine
+<img width="1395" height="935" alt="image" src="https://github.com/user-attachments/assets/ecf59209-58e9-4f35-9db4-622c09161f1e" />
 
-### 4. Shadow Market Threat Feed
-<!-- PASTE SCREENSHOT 4: THREAT INTELLIGENCE FEED HERE -->
+### 4. Risk Intelligence Overview
+<img width="1447" height="922" alt="image" src="https://github.com/user-attachments/assets/f6b25fad-f5a1-44c6-a428-af92539b2e04" />
 
-### 5. Cross-Deal Consolidation Optimizer
-<!-- PASTE SCREENSHOT 5: CROSS-DEAL OVERLAP DETECTOR HERE -->
+### 5. Shadow Market Threat Feed
+<img width="903" height="609" alt="Blue and White Modern Minimalist Halftone Presentation (1)" src="https://github.com/user-attachments/assets/19ca7be1-0140-4d73-98bd-3c3f8db10ed1" />
 
-### 6. Negotiation Strategy Planner
-<!-- PASTE SCREENSHOT 6: STRATEGY GENERATOR HERE -->
+### 6. Cross-Deal Consolidation Optimizer
+<img width="701" height="332" alt="image" src="https://github.com/user-attachments/assets/6063322a-5a1e-4bcf-9c3a-2c30b4afa8ea" />
 
-### 7. AI-Generated Email Outreach
-<!-- PASTE SCREENSHOT 7: EMAIL OUTREACH DRAFT HERE -->
+### 7. Negotiation Strategy Planner
+<img width="1202" height="906" alt="image" src="https://github.com/user-attachments/assets/dd9bfc87-f2f7-45ae-9659-0b8c95bab59c" />
 
-### 8. Project Directory Selector
-<!-- PASTE SCREENSHOT 8: SEARCHABLE PROJECT NAV BAR DROPDOWN HERE -->
-
+### 8. AI-Generated Email Outreach
+<img width="1193" height="426" alt="image" src="https://github.com/user-attachments/assets/f7297893-51fe-490d-b812-36fb6b27a518" />
