@@ -87,18 +87,31 @@ The web application will launch locally at `http://localhost:5173`.
 
 ---
 
-## Database Utilities
+## Application Screenshots
 
-To facilitate clean manual testing, several script files are available in the project root:
+Below are placeholders for the 8 core screens and features of the application. You can paste your screenshots directly over each comment block:
 
-* **Complete Database Purge**: [clean_supabase.py](file:///d:/Projects/AI_Procurement_Agent/clean_supabase.py)
-  Safely clears records from all tables in reverse foreign-key dependency order (vendor quotes, contracts, risk analysis, vendors, procurements, and audit logs) for a clean slate.
-  ```powershell
-  python clean_supabase.py
-  ```
+### 1. Dashboard Overview
+<!-- PASTE SCREENSHOT 1: DASHBOARD OVERVIEW HERE -->
 
-* **Standard Project Seeding**: [set_specific_projects.py](file:///d:/Projects/AI_Procurement_Agent/scratch/set_specific_projects.py)
-  Populates the `procurements` table with a clean variety of standard projects across Software, Hardware, and Networking categories so you can test adding vendors and quotes manually in the UI.
-  ```powershell
-  python -c "import sys; sys.path.append('scratch'); import set_specific_projects; set_specific_projects.reset_to_specific_projects()"
-  ```
+### 2. Decision Simulator & Comparison Engine
+<!-- PASTE SCREENSHOT 2: COMPARISON SIMULATOR HERE -->
+
+### 3. Risk Intelligence Overview
+<!-- PASTE SCREENSHOT 3: RISK INTELLIGENCE SNAPSHOT HERE -->
+
+### 4. Shadow Market Threat Feed
+<!-- PASTE SCREENSHOT 4: THREAT INTELLIGENCE FEED HERE -->
+
+### 5. Cross-Deal Consolidation Optimizer
+<!-- PASTE SCREENSHOT 5: CROSS-DEAL OVERLAP DETECTOR HERE -->
+
+### 6. Negotiation Strategy Planner
+<!-- PASTE SCREENSHOT 6: STRATEGY GENERATOR HERE -->
+
+### 7. AI-Generated Email Outreach
+<!-- PASTE SCREENSHOT 7: EMAIL OUTREACH DRAFT HERE -->
+
+### 8. Project Directory Selector
+<!-- PASTE SCREENSHOT 8: SEARCHABLE PROJECT NAV BAR DROPDOWN HERE -->
+
