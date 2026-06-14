@@ -93,6 +93,7 @@ Below are placeholders for the 8 core screens and features of the application. Y
 
 ### 1. Dashboard Overview
 <!-- PASTE SCREENSHOT 1: DASHBOARD OVERVIEW HERE -->
+<img width="1451" height="837" alt="image" src="https://github.com/user-attachments/assets/50e9c4a8-dd23-4a26-8a5b-b098d2689774" />
 
 ### 2. Decision Simulator & Comparison Engine
 <!-- PASTE SCREENSHOT 2: COMPARISON SIMULATOR HERE -->
