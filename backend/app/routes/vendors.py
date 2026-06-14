@@ -28,7 +28,45 @@ async def create_vendor(vendor: VendorCreate):
         if not response.data:
             raise HTTPException(status_code=400, detail="Failed to create vendor")
             
-        return response.data[0]
+        new_vendor = response.data[0]
+        
+        # Automatically create one default historical negotiation record referencing this vendor
+        try:
+            from datetime import datetime
+            from ..supabase_client import supabase_service
+            
+            # Retrieve procurement category if possible to populate category field
+            category = "Hardware"
+            if data.get("procurement_id"):
+                proc_resp = supabase.table("procurements").select("category").eq("id", data["procurement_id"]).execute()
+                if proc_resp.data:
+                    category = proc_resp.data[0].get("category", "Hardware")
+
+            negotiation_rec = {
+                "vendor_id": new_vendor["id"],
+                "vendor_name": new_vendor["vendor_name"],
+                "negotiation_date": datetime.now().date().isoformat(),
+                "discount_requested": 10.0,
+                "discount_received": 5.0,
+                "successful_tactics": ["Volume Commitment"],
+                "failed_tactics": ["Early Payment Incentive"],
+                "outcome": "partial",
+                "notes": "Baseline negotiation profile created automatically upon vendor registration.",
+                "product_category": category,
+                "initial_quote_value": 50000.0,
+                "final_negotiated_value": 47500.0,
+                "strategy_used": "Volume Commitment",
+                "negotiation_rounds": 2,
+                "success_score": 75
+            }
+            
+            client = supabase_service or supabase
+            client.table("negotiation_history").insert(negotiation_rec).execute()
+        except Exception as neg_err:
+            # Log negotiation creation error but do not fail the main vendor creation request
+            print(f"Warning: Failed to create default negotiation record: {neg_err}")
+            
+        return new_vendor
     except HTTPException:
         raise
     except Exception as e:
