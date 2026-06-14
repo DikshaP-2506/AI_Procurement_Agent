@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useProcurement } from '../context/ProcurementContext';
 import { createProcurement } from '../api/procurementApi';
@@ -13,6 +13,28 @@ export default function Navbar() {
   const [category, setCategory] = useState('Software');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Searchable dropdown states & refs
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedProject = procurements.find(p => p.id === selectedProcurementId);
+  const filteredProjects = procurements.filter(p => 
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.department.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const linkStyle = (isActive: boolean) => ({
     padding: '8px 16px',
@@ -108,33 +130,161 @@ export default function Navbar() {
 
           {/* Selector & Add Button Container */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <select
-              value={selectedProcurementId}
-              onChange={(e) => setSelectedProcurementId(e.target.value)}
-              style={{
-                background: 'rgba(16, 20, 38, 0.8)',
-                color: '#FFFFFF',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: '8px',
-                padding: '6px 14px',
-                fontSize: '13px',
-                fontWeight: 600,
-                outline: 'none',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
-              }}
-            >
-              {procurements.length === 0 ? (
-                <option value="">No active projects</option>
-              ) : (
-                procurements.map((p) => (
-                  <option key={p.id} value={p.id} style={{ background: '#0A0A0F', color: '#FFFFFF' }}>
-                    {p.title}
-                  </option>
-                ))
+            <div ref={dropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                style={{
+                  background: 'rgba(16, 20, 38, 0.8)',
+                  color: '#FFFFFF',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '8px',
+                  padding: '6px 14px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  outline: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  minWidth: 320,
+                  justifyContent: 'space-between'
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
+                  {selectedProject ? selectedProject.title : 'Select Project...'}
+                </span>
+                <svg 
+                  style={{ 
+                    width: 10, 
+                    height: 10, 
+                    transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
+                    transition: 'transform 0.2s ease',
+                    color: '#94A3B8',
+                    flexShrink: 0
+                  }} 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="3" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {isDropdownOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  left: 0,
+                  background: 'rgba(16, 20, 38, 0.96)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '10px',
+                  width: 350,
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                  zIndex: 200,
+                  padding: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8
+                }}>
+                  {/* Search Input */}
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder="Search projects..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      autoFocus
+                      style={{
+                        width: '100%',
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        color: '#FFFFFF',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        borderRadius: '6px',
+                        padding: '6px 10px 6px 28px',
+                        fontSize: '12px',
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                      }}
+                    />
+                    <svg 
+                      style={{ position: 'absolute', left: 8, top: 9, width: 12, height: 12, color: '#64748B' }} 
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                  </div>
+
+                  {/* List Container */}
+                  <div style={{
+                    maxHeight: 220,
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    paddingRight: 2
+                  }}>
+                    {filteredProjects.length === 0 ? (
+                      <div style={{ color: '#64748B', fontSize: '12px', padding: '12px 8px', textAlign: 'center' }}>
+                        No projects found
+                      </div>
+                    ) : (
+                      filteredProjects.map((p) => {
+                        const isSelected = p.id === selectedProcurementId;
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => {
+                              setSelectedProcurementId(p.id);
+                              setIsDropdownOpen(false);
+                              setSearchQuery('');
+                            }}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: '6px',
+                              fontSize: '12.5px',
+                              cursor: 'pointer',
+                              color: isSelected ? '#3B82F6' : '#E2E8F0',
+                              background: isSelected ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                              transition: 'all 0.15s ease',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 2,
+                              textAlign: 'left'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                                e.currentTarget.style.color = '#FFFFFF';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.color = '#E2E8F0';
+                              }
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                            <div style={{ fontSize: '10.5px', color: '#64748B' }}>
+                              {p.department} • {p.category}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               )}
-            </select>
+            </div>
 
             {/* "+" Add Project Button */}
             <button
