@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 import RiskAlertsPanel from '../components/RiskAlertsPanel';
@@ -7,8 +7,7 @@ import RiskTrendVisualization from '../components/RiskTrendVisualization';
 import { analyzeVendorRisk, getVendorRisk, getVendorRiskHistory } from '../api/riskApi';
 import { getVendors } from '../api/vendorApi';
 import type { RiskAssessment, RiskTrendPoint } from '../types/risk';
-
-const PROCUREMENT_ID = '8ea2d01d-2137-4e83-8875-eb6a28d6e0c6';
+import { useProcurement } from '../context/ProcurementContext';
 
 function levelColor(level: RiskAssessment['final_risk_level']) {
   if (level === 'high') return '#EF4444';
@@ -18,6 +17,8 @@ function levelColor(level: RiskAssessment['final_risk_level']) {
 
 export default function VendorRiskOverview() {
   const params = useParams<{ vendorId?: string }>();
+  const navigate = useNavigate();
+  const { selectedProcurementId } = useProcurement();
   const [vendors, setVendors] = useState<any[]>([]);
   const [vendorId, setVendorId] = useState<string>(params.vendorId ?? '');
   const [assessment, setAssessment] = useState<RiskAssessment | null>(null);
@@ -26,15 +27,26 @@ export default function VendorRiskOverview() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const vs = await getVendors(PROCUREMENT_ID);
-        setVendors(vs);
-      } catch (e) {
-        console.error("Failed to load vendors selector list", e);
-      }
-    })();
-  }, []);
+    if (selectedProcurementId) {
+      (async () => {
+        try {
+          const vs = await getVendors(selectedProcurementId);
+          setVendors(vs);
+          
+          // Preserve selection if it exists in the active project, otherwise reset
+          const currentId = vendorId || params.vendorId || '';
+          const hasCurrentVendor = vs.some(v => v.id === currentId);
+          if (hasCurrentVendor) {
+            setVendorId(currentId);
+          } else {
+            setVendorId('');
+          }
+        } catch (e) {
+          console.error("Failed to load vendors selector list", e);
+        }
+      })();
+    }
+  }, [selectedProcurementId]);
 
   useEffect(() => {
     if (vendorId) {
@@ -105,7 +117,15 @@ export default function VendorRiskOverview() {
             <div style={{ display: 'flex', gap: 12 }}>
               <select
                 value={vendorId}
-                onChange={(e) => setVendorId(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setVendorId(val);
+                  if (val) {
+                    navigate(`/risk/${val}`);
+                  } else {
+                    navigate('/risk');
+                  }
+                }}
                 style={{
                   flex: 1,
                   background: 'rgba(0, 0, 0, 0.35)',
@@ -119,9 +139,14 @@ export default function VendorRiskOverview() {
                 }}
               >
                 <option value="">-- select registered vendor --</option>
-                {vendors.map(v => (
-                  <option key={v.id} value={v.id}>{v.vendor_name} ({v.country})</option>
-                ))}
+                {vendors.map(v => {
+                  const suffix = v.procurements?.title ? ` (${v.procurements.title})` : '';
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {v.vendor_name} ({v.country || 'N/A'}){suffix}
+                    </option>
+                  );
+                })}
               </select>
               <button
                 onClick={() => vendorId && void loadVendorRisk(vendorId)}

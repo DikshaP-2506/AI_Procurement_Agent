@@ -3,22 +3,26 @@ import { Link } from 'react-router-dom';
 import { Vendor, VendorCreate } from '../types/vendor';
 import { createVendor, getVendors } from '../api/vendorApi';
 import Navbar from '../components/Navbar';
-
-const PROCUREMENT_ID = '8ea2d01d-2137-4e83-8875-eb6a28d6e0c6';
+import { useProcurement } from '../context/ProcurementContext';
 
 export default function VendorManagement() {
+  const { selectedProcurementId } = useProcurement();
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [form, setForm] = useState<VendorCreate>({ procurement_id: PROCUREMENT_ID, vendor_name: '', contact_person: '', email: '', phone: '', country: '' });
+  const [form, setForm] = useState<VendorCreate>({ procurement_id: selectedProcurementId, vendor_name: '', contact_person: '', email: '', phone: '', country: '' });
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchVendors();
-  }, []);
+    if (selectedProcurementId) {
+      fetchVendors();
+      setForm(prev => ({ ...prev, procurement_id: selectedProcurementId }));
+    }
+  }, [selectedProcurementId]);
 
   async function fetchVendors() {
+    if (!selectedProcurementId) return;
     try {
-      const data = await getVendors(PROCUREMENT_ID);
+      const data = await getVendors(selectedProcurementId);
       setVendors(data);
     } catch (e) {
       console.error(e);
@@ -27,22 +31,24 @@ export default function VendorManagement() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.vendor_name.trim()) return;
+    if (!form.vendor_name.trim() || !selectedProcurementId) return;
     
     try {
       setSubmitting(true);
       setMessage(null);
-      await createVendor(form);
-      setMessage({ text: 'Vendor created successfully', isError: false });
-      setForm({ procurement_id: PROCUREMENT_ID, vendor_name: '', contact_person: '', email: '', phone: '', country: '' });
+      await createVendor({ ...form, procurement_id: selectedProcurementId });
+      setMessage({ text: 'Vendor registered successfully', isError: false });
+      setForm({ procurement_id: selectedProcurementId, vendor_name: '', contact_person: '', email: '', phone: '', country: '' });
       fetchVendors();
       setTimeout(() => setMessage(null), 4000);
-    } catch (err) {
-      setMessage({ text: 'Error creating vendor. Please check connection.', isError: true });
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || 'Error creating vendor. Please check connection.';
+      setMessage({ text: errorMsg, isError: true });
     } finally {
       setSubmitting(false);
     }
   }
+
 
   return (
     <div style={{ background: '#0A0A0F', minHeight: '100vh' }}>

@@ -133,9 +133,11 @@ def _row_to_legacy_response(row: Dict[str, Any]) -> Dict[str, Any]:
     alerts = _normalize_alerts(row.get("alerts", []))
     source_links = row.get("source_links", []) if isinstance(row.get("source_links", []), list) else []
 
+    from datetime import datetime
     return {
         "vendor_id": str(row.get("vendor_id") or ""),
         "vendor_name": None,
+        "created_at": row.get("created_at") or datetime.now().isoformat(),
         "historical_score": max(0, min(100, 100 - financial_risk_score)),
         "on_time_delivery_rate": max(0, min(100, 100 - supply_chain_risk_score)),
         "sla_compliance": max(0, min(100, 100 - legal_risk_score)),

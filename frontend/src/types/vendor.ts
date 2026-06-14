@@ -12,6 +12,9 @@ export interface VendorCreate {
 export interface Vendor extends VendorCreate {
   id: string;
   created_at: string;
+  procurements?: {
+    title: string;
+  };
 }
 
 export interface VendorQuote {

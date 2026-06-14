@@ -55,8 +55,18 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
     if not vendors:
         try:
             vendors_resp = client.table("vendors").select("*").execute()
-            vendors = vendors_resp.data or []
-            logger.info(f"Fallback: Fetched all {len(vendors)} vendors because procurement_id {procurement_id} returned 0 results.")
+            all_vendors = vendors_resp.data or []
+            
+            # Deduplicate by vendor name during fallback to avoid double entries
+            seen_names = set()
+            vendors = []
+            for v in all_vendors:
+                name_clean = str(v.get("vendor_name", "")).lower().strip()
+                if name_clean not in seen_names:
+                    seen_names.add(name_clean)
+                    vendors.append(v)
+            
+            logger.info(f"Fallback: Fetched {len(vendors)} unique vendors because procurement_id {procurement_id} returned 0 results.")
         except Exception as e:
             logger.error(f"Error in fallback fetching all vendors: {e}")
             vendors = []

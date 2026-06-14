@@ -58,6 +58,13 @@ def create_vendors() -> Dict[str, str]:
 
     for vendor in vendors:
         try:
+            # Check if vendor already exists to prevent duplicate entries
+            existing = supabase.table("vendors").select("id").eq("vendor_name", vendor["vendor_name"]).execute().data
+            if existing:
+                vendor_map[vendor["vendor_name"]] = existing[0]["id"]
+                print(f"✓ Vendor already exists: {vendor['vendor_name']} (ID: {existing[0]['id']})")
+                continue
+
             response = supabase.table("vendors").insert(vendor).execute()
             created = response.data[0]
             vendor_map[vendor["vendor_name"]] = created["id"]

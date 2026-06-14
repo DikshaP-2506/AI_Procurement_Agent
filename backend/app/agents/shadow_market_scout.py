@@ -33,6 +33,65 @@ class MarketSignalProvider(ABC):
         raise NotImplementedError
 
 
+def fetch_live_news_signals(vendor_name: str) -> List[Dict[str, Any]]:
+    if not vendor_name:
+        return []
+    
+    import urllib.request
+    import urllib.parse
+    import xml.etree.ElementTree as ET
+    
+    alerts: List[Dict[str, Any]] = []
+    try:
+        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(vendor_name)}"
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            xml_data = response.read()
+            
+        root = ET.fromstring(xml_data)
+        
+        high_risk_keywords = [
+            "lawsuit", "fine", "sanction", "bankruptcy", "breach", "hack", 
+            "strike", "investigation", "insolvent", "fraud"
+        ]
+        med_risk_keywords = [
+            "layoff", "shortage", "restructure", "merger", "acquisition", 
+            "delay", "disrupt", "loss"
+        ]
+        
+        items = root.findall('.//item')[:4]
+        for item in items:
+            title = item.find('title').text if item.find('title') is not None else ''
+            if not title:
+                continue
+                
+            title_lower = title.lower()
+            has_high = any(kw in title_lower for kw in high_risk_keywords)
+            has_med = any(kw in title_lower for kw in med_risk_keywords)
+            
+            if has_high:
+                alerts.append({
+                    "alert_type": "live_news_critical",
+                    "severity": "high",
+                    "message": f"Critical Market news: {title}",
+                    "source": "live_news_scout"
+                })
+            elif has_med:
+                alerts.append({
+                    "alert_type": "live_news_warning",
+                    "severity": "medium",
+                    "message": f"Warning Market news: {title}",
+                    "source": "live_news_scout"
+                })
+    except Exception as e:
+        print(f"Error fetching live news signals for {vendor_name}: {e}")
+        
+    return alerts
+
+
 class RuleBasedMarketSignalProvider(MarketSignalProvider):
     provider_name = "rule_based_mock"
 
@@ -45,7 +104,11 @@ class RuleBasedMarketSignalProvider(MarketSignalProvider):
         negotiations: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         alerts: List[Dict[str, Any]] = []
-        vendor_name = str(vendor.get("vendor_name", "")).lower()
+        raw_name = vendor.get("vendor_name", "")
+        news_alerts = fetch_live_news_signals(raw_name)
+        alerts.extend(news_alerts)
+        
+        vendor_name = str(raw_name).lower()
         on_time = int(historical_performance.get("on_time_delivery_rate", 75) or 75)
         sla = int(historical_performance.get("sla_compliance", 75) or 75)
         active_contracts = len(contracts)

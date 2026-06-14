@@ -16,6 +16,12 @@ async def create_vendor(vendor: VendorCreate):
         data = vendor.model_dump()
         # Convert UUID to string for JSON serialization
         data['procurement_id'] = str(data['procurement_id'])
+        
+        # Check if a vendor with the same name already exists in this procurement project
+        existing = supabase.table("vendors").select("id").eq("vendor_name", data["vendor_name"]).eq("procurement_id", data["procurement_id"]).execute()
+        if existing.data:
+            raise HTTPException(status_code=400, detail="A supplier with this name is already registered in this project.")
+            
         response = supabase.table("vendors").insert(data).execute()
         
         # supabase-py returns data in response.data
@@ -23,6 +29,8 @@ async def create_vendor(vendor: VendorCreate):
             raise HTTPException(status_code=400, detail="Failed to create vendor")
             
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -44,12 +52,15 @@ async def get_vendor(vendor_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/")
-async def list_vendors():
+async def list_vendors(procurement_id: str = None):
     """
-    List all vendors.
+    List all vendors, optionally filtered by procurement_id.
     """
     try:
-        response = supabase.table("vendors").select("*").execute()
+        query = supabase.table("vendors").select("*, procurements(title)")
+        if procurement_id:
+            query = query.eq("procurement_id", procurement_id)
+        response = query.execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

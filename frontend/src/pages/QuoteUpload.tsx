@@ -3,10 +3,10 @@ import Navbar from '../components/Navbar';
 import { getVendors } from '../api/vendorApi';
 import uploadQuote from '../api/quoteApi';
 import { Vendor } from '../types/vendor';
-
-const PROCUREMENT_ID = '8ea2d01d-2137-4e83-8875-eb6a28d6e0c6';
+import { useProcurement } from '../context/ProcurementContext';
 
 export default function QuoteUpload() {
+  const { selectedProcurementId } = useProcurement();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
@@ -15,15 +15,18 @@ export default function QuoteUpload() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const vs = await getVendors(PROCUREMENT_ID);
-        setVendors(vs);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, []);
+    if (selectedProcurementId) {
+      (async () => {
+        try {
+          const vs = await getVendors(selectedProcurementId);
+          setVendors(vs);
+          setSelectedVendor(''); // Reset vendor selection when project changes
+        } catch (e) {
+          console.error(e);
+        }
+      })();
+    }
+  }, [selectedProcurementId]);
 
   async function onUpload() {
     if (!selectedVendor || !file) {
@@ -80,7 +83,10 @@ export default function QuoteUpload() {
               }}
             >
               <option value="">-- select vendor --</option>
-              {vendors.map(v => <option key={v.id} value={v.id}>{v.vendor_name}</option>)}
+              {vendors.map(v => {
+                const suffix = v.procurements?.title ? ` (${v.procurements.title})` : '';
+                return <option key={v.id} value={v.id}>{v.vendor_name}{suffix}</option>;
+              })}
             </select>
           </div>
 

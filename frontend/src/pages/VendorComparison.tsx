@@ -4,10 +4,11 @@ import { Vendor, VendorQuote } from '../types/vendor';
 import { getVendors, getVendorQuotes } from '../api/vendorApi';
 import { getRecommendations, applyRecommendation, Weights, VendorRecommendation } from '../api/recommendationApi';
 import Navbar from '../components/Navbar';
-
-const PROCUREMENT_ID = '8ea2d01d-2137-4e83-8875-eb6a28d6e0c6';
+import { useProcurement } from '../context/ProcurementContext';
 
 export default function VendorComparison() {
+  const { selectedProcurementId } = useProcurement();
+
   // Existing state to preserve original table functionality
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [quotesMap, setQuotesMap] = useState<Record<string, VendorQuote[]>>({});
@@ -29,18 +30,23 @@ export default function VendorComparison() {
   const [applyReasoning, setApplyReasoning] = useState<string>('');
 
   useEffect(() => {
-    loadBaseData();
-  }, []);
+    if (selectedProcurementId) {
+      loadBaseData();
+    }
+  }, [selectedProcurementId]);
 
-  // Fetch recommendations whenever weights or qualitative adjustments change
+  // Fetch recommendations whenever weights, qualitative adjustments, or selected project change
   useEffect(() => {
-    fetchSimulatedRankings();
-  }, [weights, qualitativeAdjustments]);
+    if (selectedProcurementId) {
+      fetchSimulatedRankings();
+    }
+  }, [selectedProcurementId, weights, qualitativeAdjustments]);
 
   async function loadBaseData() {
+    if (!selectedProcurementId) return;
     try {
       setLoading(true);
-      const vs = await getVendors(PROCUREMENT_ID);
+      const vs = await getVendors(selectedProcurementId);
       
       const map: Record<string, VendorQuote[]> = {};
       await Promise.all(vs.map(async v => {
@@ -83,8 +89,9 @@ export default function VendorComparison() {
   }
 
   async function fetchSimulatedRankings() {
+    if (!selectedProcurementId) return;
     try {
-      const res = await getRecommendations(PROCUREMENT_ID, weights, qualitativeAdjustments);
+      const res = await getRecommendations(selectedProcurementId, weights, qualitativeAdjustments);
       setRankedRecommendations(res.recommendations);
       setComparisonSummary(res.comparison_summary);
       setApiWarning(res.warning || null);
@@ -92,6 +99,7 @@ export default function VendorComparison() {
       console.error("Failed to fetch simulated rankings", e);
     }
   }
+
 
   // Preset Handlers
   const applyPreset = (presetName: string) => {
@@ -134,7 +142,7 @@ export default function VendorComparison() {
       setMessage(null);
       
       const res = await applyRecommendation(
-        PROCUREMENT_ID,
+        selectedProcurementId,
         selectedVendorForApply.vendor_id,
         weights,
         applyReasoning || `Selected ${selectedVendorForApply.vendor_name} based on simulator scoring (Total Score: ${selectedVendorForApply.final_score}).`
