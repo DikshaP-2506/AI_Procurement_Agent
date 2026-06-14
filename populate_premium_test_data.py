@@ -35,6 +35,11 @@ def clean_database():
     """Clear existing test data to start fresh in correct dependency order."""
     print("Cleaning database...")
     try:
+        # Delete negotiation history first
+        try:
+            supabase.table("negotiation_history").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+        except Exception as e:
+            print(f"Note: Could not clean negotiation_history: {e}")
         # Delete vendor quotes first
         supabase.table("vendor_quotes").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
         # Delete contracts
@@ -50,9 +55,129 @@ def clean_database():
         supabase.table("procurements").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
         # Delete audit logs
         supabase.table("audit_logs").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-        print("✓ Database cleaned successfully!")
+        print("[OK] Database cleaned successfully!")
     except Exception as e:
         print(f"Warning during cleaning: {e}")
+
+def create_historical_negotiations(vendor_records, today):
+    """Seed exactly 1 distinct historical negotiation related to each premium vendor."""
+    print("\nCreating historical negotiations...")
+    
+    # Predefined templates matching our premium vendor list
+    templates = {
+        "Microsoft Corporation": {
+            "negotiation_date": str(today - timedelta(days=90)),
+            "discount_requested": 15.0,
+            "discount_received": 12.0,
+            "successful_tactics": ["Multi-Year Contract", "License Consolidation"],
+            "failed_tactics": ["Early Payment Incentive"],
+            "outcome": "success",
+            "notes": "Negotiated premium enterprise software licenses. Volume bundling across IT, Finance, and HR departments secured a 12% discount.",
+            "product_category": "Software",
+            "initial_quote_value": 3000000.0,
+            "final_negotiated_value": 2640000.0,
+            "strategy_used": "License Consolidation",
+            "negotiation_rounds": 3,
+            "success_score": 90.0
+        },
+        "Dell Technologies": {
+            "negotiation_date": str(today - timedelta(days=120)),
+            "discount_requested": 20.0,
+            "discount_received": 15.0,
+            "successful_tactics": ["Bulk Purchase", "Vendor Consolidation"],
+            "failed_tactics": ["Early Payment Incentive"],
+            "outcome": "success",
+            "notes": "Bulk hardware procurement for Latitude laptops. Pushing competitive bids from Lenovo forced a 15% discount on the hardware units.",
+            "product_category": "Hardware",
+            "initial_quote_value": 250000.0,
+            "final_negotiated_value": 2125000.0,
+            "strategy_used": "Bulk Purchase",
+            "negotiation_rounds": 4,
+            "success_score": 92.0
+        },
+        "Adobe Inc": {
+            "negotiation_date": str(today - timedelta(days=60)),
+            "discount_requested": 10.0,
+            "discount_received": 5.0,
+            "successful_tactics": ["Volume Commitment"],
+            "failed_tactics": ["Competitive Bidding"],
+            "outcome": "partial",
+            "notes": "Creative Cloud license negotiation for Marketing. Adobe held firm on subscription pricing but allowed a 5% discount on additional seats.",
+            "product_category": "Software",
+            "initial_quote_value": 150000.0,
+            "final_negotiated_value": 142500.0,
+            "strategy_used": "Volume Commitment",
+            "negotiation_rounds": 2,
+            "success_score": 68.0
+        },
+        "Cisco Systems Inc": {
+            "negotiation_date": str(today - timedelta(days=150)),
+            "discount_requested": 15.0,
+            "discount_received": 10.0,
+            "successful_tactics": ["Competitive Bidding"],
+            "failed_tactics": ["Long-Term Contract"],
+            "outcome": "success",
+            "notes": "Enterprise networking switches. Secured 10% discount by citing alternative pricing from Arista and committing to immediate PO release.",
+            "product_category": "Networking",
+            "initial_quote_value": 500000.0,
+            "final_negotiated_value": 450000.0,
+            "strategy_used": "Competitive Bidding",
+            "negotiation_rounds": 3,
+            "success_score": 84.0
+        },
+        "Apple Inc": {
+            "negotiation_date": str(today - timedelta(days=200)),
+            "discount_requested": 8.0,
+            "discount_received": 2.5,
+            "successful_tactics": ["Early Payment Incentive"],
+            "failed_tactics": ["Bulk Purchase"],
+            "outcome": "partial",
+            "notes": "MacBook supply agreement. Apple does not offer volume discounts; secured 2.5% reduction via Net 10 payment terms option.",
+            "product_category": "Hardware",
+            "initial_quote_value": 400000.0,
+            "final_negotiated_value": 390000.0,
+            "strategy_used": "Early Payment Incentive",
+            "negotiation_rounds": 2,
+            "success_score": 45.0
+        },
+        "Amazon Web Services": {
+            "negotiation_date": str(today - timedelta(days=30)),
+            "discount_requested": 15.0,
+            "discount_received": 10.0,
+            "successful_tactics": ["Volume Commitment", "Reserved Capacity"],
+            "failed_tactics": ["Multi-Supplier Leverage"],
+            "outcome": "success",
+            "notes": "AWS Cloud Hosting negotiation. Committed to a 1-year Savings Plan to obtain 10% computed discount.",
+            "product_category": "Cloud Services",
+            "initial_quote_value": 1200000.0,
+            "final_negotiated_value": 1080000.0,
+            "strategy_used": "Reserved Capacity",
+            "negotiation_rounds": 2,
+            "success_score": 85.0
+        }
+    }
+    
+    inserted_vendors = set()
+    for rec in vendor_records:
+        vendor_name = rec["vendor_name"]
+        
+        # Prevent inserting duplicate negotiations if the vendor exists multiple times (e.g. cross-deal)
+        if vendor_name in inserted_vendors:
+            continue
+            
+        tpl = templates.get(vendor_name)
+        if tpl:
+            payload = {
+                "vendor_id": rec["id"],
+                "vendor_name": vendor_name,
+                **tpl
+            }
+            try:
+                supabase.table("negotiation_history").insert(payload).execute()
+                print(f"[OK] Seeded negotiation for vendor: {vendor_name}")
+                inserted_vendors.add(vendor_name)
+            except Exception as e:
+                print(f"[ERROR] Failed to seed negotiation for {vendor_name}: {e}")
 
 def main():
     print("============================================================")
@@ -81,9 +206,9 @@ def main():
             if resp.data:
                 created = resp.data[0]
                 procurement_map[p["title"]] = created["id"]
-                print(f"✓ Created Procurement: {p['title']} ({created['id']})")
+                print(f"[OK] Created Procurement: {p['title']} ({created['id']})")
         except Exception as e:
-            print(f"✗ Failed to create procurement {p['title']}: {e}")
+            print(f"[ERROR] Failed to create procurement {p['title']}: {e}")
             
     # 2. Create Vendors (associated with Procurements for cross-deal logic)
     print("\nCreating vendors...")
@@ -165,9 +290,9 @@ def main():
             if resp.data:
                 created = resp.data[0]
                 vendor_records.append(created)
-                print(f"✓ Created Vendor: {v['vendor_name']} on Procurement {v['procurement_id']} ({created['id']})")
+                print(f"[OK] Created Vendor: {v['vendor_name']} on Procurement {v['procurement_id']} ({created['id']})")
         except Exception as e:
-            print(f"✗ Failed to create vendor {v['vendor_name']}: {e}")
+            print(f"[ERROR] Failed to create vendor {v['vendor_name']}: {e}")
             
     # Find a specific vendor record by name & procurement_id
     def get_vendor_id(name: str, proc_title: str = None) -> str:
@@ -257,9 +382,9 @@ def main():
             continue
         try:
             supabase.table("vendor_quotes").insert(q).execute()
-            print(f"✓ Created Quote for Vendor {q['vendor_id']} (Price: ₹{q['price']:,})")
+            print(f"[OK] Created Quote for Vendor {q['vendor_id']} (Price: {q['price']:,})")
         except Exception as e:
-            print(f"✗ Failed to create quote for vendor {q['vendor_id']}: {e}")
+            print(f"[ERROR] Failed to create quote for vendor {q['vendor_id']}: {e}")
 
     # 4. Create Contracts (associated with the vendors for renewal alerts)
     print("\nCreating contracts...")
@@ -313,16 +438,19 @@ def main():
     
     for c in contracts_to_create:
         if not c["vendor_id"]:
-            print(f"✗ Vendor not found for contract {c['contract_name']}")
+            print(f"[ERROR] Vendor not found for contract {c['contract_name']}")
             continue
         try:
             supabase.table("contracts").insert(c).execute()
-            print(f"✓ Created Contract: {c['contract_name']} for Vendor {c['vendor_id']}")
+            print(f"[OK] Created Contract: {c['contract_name']} for Vendor {c['vendor_id']}")
         except Exception as e:
-            print(f"✗ Failed to create contract {c['contract_name']}: {e}")
+            print(f"[ERROR] Failed to create contract {c['contract_name']}: {e}")
+
+    # 5. Create Historical Negotiations
+    create_historical_negotiations(vendor_records, today)
             
     print("\n============================================================")
-    print("✓ PREMIUM DATA POPULATION COMPLETE!")
+    print("[OK] PREMIUM DATA POPULATION COMPLETE!")
     print("============================================================")
 
 if __name__ == "__main__":

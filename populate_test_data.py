@@ -62,15 +62,15 @@ def create_vendors() -> Dict[str, str]:
             existing = supabase.table("vendors").select("id").eq("vendor_name", vendor["vendor_name"]).execute().data
             if existing:
                 vendor_map[vendor["vendor_name"]] = existing[0]["id"]
-                print(f"✓ Vendor already exists: {vendor['vendor_name']} (ID: {existing[0]['id']})")
+                print(f"[OK] Vendor already exists: {vendor['vendor_name']} (ID: {existing[0]['id']})")
                 continue
 
             response = supabase.table("vendors").insert(vendor).execute()
             created = response.data[0]
             vendor_map[vendor["vendor_name"]] = created["id"]
-            print(f"✓ Created vendor: {vendor['vendor_name']} (ID: {created['id']})")
+            print(f"[OK] Created vendor: {vendor['vendor_name']} (ID: {created['id']})")
         except Exception as e:
-            print(f"✗ Error creating vendor {vendor['vendor_name']}: {e}")
+            print(f"[ERROR] Error creating vendor {vendor['vendor_name']}: {e}")
 
     return vendor_map
 
@@ -123,14 +123,14 @@ def create_contracts(vendor_map: Dict[str, str]):
 
     for contract in contracts:
         if not contract["vendor_id"]:
-            print(f"✗ Skipping contract {contract['contract_name']} - vendor not found")
+            print(f"[ERROR] Skipping contract {contract['contract_name']} - vendor not found")
             continue
 
         try:
             supabase.table("contracts").insert(contract).execute()
-            print(f"✓ Created contract: {contract['contract_name']}")
+            print(f"[OK] Created contract: {contract['contract_name']}")
         except Exception as e:
-            print(f"✗ Error creating contract {contract['contract_name']}: {e}")
+            print(f"[ERROR] Error creating contract {contract['contract_name']}: {e}")
 
 def create_procurements(vendor_map: Dict[str, str]):
     """Create procurement records using the current procurements schema."""
@@ -160,37 +160,132 @@ def create_procurements(vendor_map: Dict[str, str]):
         try:
             supabase.table("procurements").insert(payload).execute()
             count += 1
-            print(f"✓ Created procurement: {procurement['department']} / {procurement['category']}")
+            print(f"[OK] Created procurement: {procurement['department']} / {procurement['category']}")
         except Exception as e:
-            print(f"✗ Error creating procurement for {procurement['department']} / {procurement['category']}: {e}")
+            print(f"[ERROR] Error creating procurement for {procurement['department']} / {procurement['category']}: {e}")
 
-    print(f"\n✓ Total procurements created: {count}")
+    print(f"\n[OK] Total procurements created: {count}")
+
+def create_historical_negotiations(vendor_map: Dict[str, str]):
+    """Create test historical negotiation records for each vendor."""
+    print("\n" + "="*60)
+    print("Creating historical negotiations")
+    print("="*60)
+
+    negotiations = [
+        {
+            "vendor_id": vendor_map.get("Dell Technologies"),
+            "vendor_name": "Dell Technologies",
+            "negotiation_date": "2024-05-15",
+            "discount_requested": 15.0,
+            "discount_received": 10.0,
+            "successful_tactics": ["Bulk Purchase", "Competitive Bidding"],
+            "failed_tactics": ["Early Payment Incentive"],
+            "outcome": "success",
+            "notes": "Secured 10% discount on latitude laptops through volume consolidation.",
+            "product_category": "Hardware",
+            "initial_quote_value": 150000.0,
+            "final_negotiated_value": 135000.0,
+            "strategy_used": "Bulk Purchase",
+            "negotiation_rounds": 3,
+            "success_score": 85.0
+        },
+        {
+            "vendor_id": vendor_map.get("Microsoft"),
+            "vendor_name": "Microsoft",
+            "negotiation_date": "2024-06-10",
+            "discount_requested": 12.0,
+            "discount_received": 8.0,
+            "successful_tactics": ["Multi-Year Contract"],
+            "failed_tactics": ["Competitive Bidding"],
+            "outcome": "success",
+            "notes": "Negotiated enterprise license discount by signing a 3-year term commitment.",
+            "product_category": "Software",
+            "initial_quote_value": 85000.0,
+            "final_negotiated_value": 78200.0,
+            "strategy_used": "Multi-Year Contract",
+            "negotiation_rounds": 2,
+            "success_score": 80.0
+        },
+        {
+            "vendor_id": vendor_map.get("Apple Inc"),
+            "vendor_name": "Apple Inc",
+            "negotiation_date": "2024-04-20",
+            "discount_requested": 10.0,
+            "discount_received": 3.0,
+            "successful_tactics": ["Early Payment Incentive"],
+            "failed_tactics": ["Bulk Purchase"],
+            "outcome": "partial",
+            "notes": "Apple held firm on pricing. Secured a minor discount via 10-day early payment incentive.",
+            "product_category": "Devices",
+            "initial_quote_value": 60000.0,
+            "final_negotiated_value": 58200.0,
+            "strategy_used": "Early Payment Incentive",
+            "negotiation_rounds": 2,
+            "success_score": 50.0
+        },
+        {
+            "vendor_id": vendor_map.get("Cisco Systems"),
+            "vendor_name": "Cisco Systems",
+            "negotiation_date": "2024-07-05",
+            "discount_requested": 15.0,
+            "discount_received": 9.5,
+            "successful_tactics": ["Competitive Bidding", "Volume Commitment"],
+            "failed_tactics": ["Long-Term Contract"],
+            "outcome": "success",
+            "notes": "Acquired discounts on routing equipment by leveraging bids from Juniper.",
+            "product_category": "Networking",
+            "initial_quote_value": 110000.0,
+            "final_negotiated_value": 99550.0,
+            "strategy_used": "Competitive Bidding",
+            "negotiation_rounds": 3,
+            "success_score": 82.0
+        }
+    ]
+
+    for neg in negotiations:
+        if not neg["vendor_id"]:
+            print(f"[ERROR] Skipping negotiation for {neg['vendor_name']} - vendor not found")
+            continue
+
+        try:
+            # Check if negotiation record already exists to prevent duplicate entries
+            existing = supabase.table("negotiation_history").select("id").eq("vendor_id", neg["vendor_id"]).eq("negotiation_date", neg["negotiation_date"]).execute().data
+            if existing:
+                print(f"[OK] Negotiation already exists for {neg['vendor_name']}")
+                continue
+
+            supabase.table("negotiation_history").insert(neg).execute()
+            print(f"[OK] Created historical negotiation for: {neg['vendor_name']}")
+        except Exception as e:
+            print(f"[ERROR] Error creating negotiation for {neg['vendor_name']}: {e}")
 
 def main():
     print("\n" + "█"*60)
     print("SUPABASE TEST DATA POPULATION SCRIPT")
     print("█"*60)
     print(f"\nSUPABASE_URL: {SUPABASE_URL}")
-    
+
     # Test connection
     try:
         response = supabase.table("vendors").select("count", count="exact").execute()
-        print(f"✓ Connected to Supabase")
+        print(f"[OK] Connected to Supabase")
     except Exception as e:
-        print(f"✗ Failed to connect to Supabase: {e}")
+        print(f"[ERROR] Failed to connect to Supabase: {e}")
         print("\nMake sure your .env file has:")
         print("  SUPABASE_URL=your_url")
         print("  SUPABASE_KEY=your_key")
         print("  SUPABASE_SERVICE_ROLE_KEY=your_service_role_key")
         sys.exit(1)
-    
-    # Populate in the current schema order: vendors -> contracts -> procurements
+
+    # Populate in the current schema order: vendors -> contracts -> procurements -> historical negotiations
     vendor_map = create_vendors()
     create_contracts(vendor_map)
     create_procurements(vendor_map)
-    
+    create_historical_negotiations(vendor_map)
+
     print("\n" + "="*60)
-    print("✓ TEST DATA POPULATION COMPLETE!")
+    print("[OK] TEST DATA POPULATION COMPLETE!")
     print("="*60)
     print("\nNow run: python test_endpoints.py")
     print("You should see data in the responses instead of empty arrays.")
