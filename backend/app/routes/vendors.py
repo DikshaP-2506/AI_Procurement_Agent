@@ -65,6 +65,14 @@ async def create_vendor(vendor: VendorCreate):
         except Exception as neg_err:
             # Log negotiation creation error but do not fail the main vendor creation request
             print(f"Warning: Failed to create default negotiation record: {neg_err}")
+
+        # Automatically run initial risk analysis and persist it to vendor_risk_analysis table
+        try:
+            from ..services.risk_service import analyze_vendor_risk
+            await analyze_vendor_risk(new_vendor["id"], persist=True)
+            print(f"Automatically ran initial risk analysis for vendor {new_vendor['vendor_name']}")
+        except Exception as risk_err:
+            print(f"Warning: Failed to run initial risk analysis: {risk_err}")
             
         return new_vendor
     except HTTPException:

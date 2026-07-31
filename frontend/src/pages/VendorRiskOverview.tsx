@@ -54,15 +54,19 @@ export default function VendorRiskOverview() {
     }
   }, [vendorId]);
 
-  async function loadVendorRisk(id: string) {
+  async function loadVendorRisk(id: string, forceRefresh = false) {
     setLoading(true);
     setError(null);
     try {
       let current: RiskAssessment;
-      try {
-        current = await getVendorRisk(id);
-      } catch {
+      if (forceRefresh) {
         current = await analyzeVendorRisk(id);
+      } else {
+        try {
+          current = await getVendorRisk(id);
+        } catch {
+          current = await analyzeVendorRisk(id);
+        }
       }
       const historyResponse = await getVendorRiskHistory(id);
       setAssessment(current);
@@ -149,7 +153,7 @@ export default function VendorRiskOverview() {
                 })}
               </select>
               <button
-                onClick={() => vendorId && void loadVendorRisk(vendorId)}
+                onClick={() => vendorId && void loadVendorRisk(vendorId, true)}
                 disabled={loading || !vendorId}
                 style={{
                   background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',

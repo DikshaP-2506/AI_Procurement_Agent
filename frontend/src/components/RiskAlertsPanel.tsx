@@ -8,19 +8,21 @@ function severityColor(severity: RiskAlert['severity']) {
 }
 
 export default function RiskAlertsPanel({ alerts }: { alerts: RiskAlert[] }) {
+  const activeAlerts = alerts.filter(a => a.severity !== 'low' && a.alert_type !== 'market_stable');
+
   return (
     <div className="card-glass">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>Risk Alerts</h3>
         <span style={{ color: '#94A3B8', fontSize: 12, background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: 4 }}>
-          {alerts.length} signals
+          {activeAlerts.length} signals
         </span>
       </div>
-      {alerts.length === 0 ? (
+      {activeAlerts.length === 0 ? (
         <div style={{ color: '#94A3B8', fontSize: 13.5 }}>No risk alerts found.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {alerts.map((alert, index) => (
+          {activeAlerts.map((alert, index) => (
             <div key={`${alert.alert_type}-${index}`} style={{ padding: 14, borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.04)', background: 'rgba(0, 0, 0, 0.2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
                 <strong style={{ color: '#F8FAFC', fontSize: 14.5 }}>{alert.alert_type.replace(/_/g, ' ')}</strong>

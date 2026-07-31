@@ -179,7 +179,7 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
         
         # Qualitative offset
         qual_adj = float(qual_adjustments.get(v_id, 0.0))
-        qual_adj = max(-20.0, min(20.0, qual_adj)) # Clamped
+        qual_adj = max(-20.0, min(20.0, qual_adj)) 
 
         # Match optimization inputs
         matching_crossdeal = None

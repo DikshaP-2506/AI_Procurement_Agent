@@ -43,7 +43,10 @@ def fetch_live_news_signals(vendor_name: str) -> List[Dict[str, Any]]:
     
     alerts: List[Dict[str, Any]] = []
     try:
-        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(vendor_name)}"
+        # Automatically append risk keywords to focus the live news monitor on warnings,
+        # allowing users to register clean, professional names like "Dell" or "Apple".
+        query = f"{vendor_name} (lawsuit OR fine OR sanction OR bankruptcy OR breach OR hack OR strike OR investigation OR layoff OR shortage OR delay)"
+        url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}"
         req = urllib.request.Request(
             url, 
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -77,14 +80,14 @@ def fetch_live_news_signals(vendor_name: str) -> List[Dict[str, Any]]:
                     "alert_type": "live_news_critical",
                     "severity": "high",
                     "message": f"Critical Market news: {title}",
-                    "source": "live_news_scout"
+                    "source": "Live News Monitor"
                 })
             elif has_med:
                 alerts.append({
                     "alert_type": "live_news_warning",
                     "severity": "medium",
                     "message": f"Warning Market news: {title}",
-                    "source": "live_news_scout"
+                    "source": "Live News Monitor"
                 })
     except Exception as e:
         print(f"Error fetching live news signals for {vendor_name}: {e}")
@@ -93,7 +96,7 @@ def fetch_live_news_signals(vendor_name: str) -> List[Dict[str, Any]]:
 
 
 class RuleBasedMarketSignalProvider(MarketSignalProvider):
-    provider_name = "rule_based_mock"
+    provider_name = "Market Intelligence Engine"
 
     def fetch_signals(
         self,

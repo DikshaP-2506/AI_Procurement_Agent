@@ -133,10 +133,18 @@ def _row_to_legacy_response(row: Dict[str, Any]) -> Dict[str, Any]:
     alerts = _normalize_alerts(row.get("alerts", []))
     source_links = row.get("source_links", []) if isinstance(row.get("source_links", []), list) else []
 
+    vendor_name = None
+    if "vendors" in row and isinstance(row["vendors"], dict):
+        vendor_name = row["vendors"].get("vendor_name")
+        if vendor_name:
+            vendor_name = vendor_name.strip()
+    elif "vendor_name" in row:
+        vendor_name = row["vendor_name"]
+
     from datetime import datetime
     return {
         "vendor_id": str(row.get("vendor_id") or ""),
-        "vendor_name": None,
+        "vendor_name": vendor_name,
         "created_at": row.get("created_at") or datetime.now().isoformat(),
         "historical_score": max(0, min(100, 100 - financial_risk_score)),
         "on_time_delivery_rate": max(0, min(100, 100 - supply_chain_risk_score)),
@@ -362,7 +370,7 @@ async def get_latest_vendor_risk(vendor_id: str, client: Any | None = None) -> D
     active_client = client or _client()
     response = (
         active_client.table("vendor_risk_analysis")
-        .select("*")
+        .select("*, vendors(vendor_name)")
         .eq("vendor_id", vendor_id)
         .order("created_at", desc=True)
         .limit(1)
@@ -378,7 +386,7 @@ async def get_vendor_history(vendor_id: str, client: Any | None = None, limit: i
     active_client = client or _client()
     response = (
         active_client.table("vendor_risk_analysis")
-        .select("*")
+        .select("*, vendors(vendor_name)")
         .eq("vendor_id", vendor_id)
         .order("created_at", desc=True)
         .limit(limit)
@@ -387,15 +395,37 @@ async def get_vendor_history(vendor_id: str, client: Any | None = None, limit: i
     return [_row_to_legacy_response(row) for row in _rows(response)]
 
 
-async def get_risk_dashboard(client: Any | None = None, limit: int = 25) -> Dict[str, Any]:
+async def get_risk_dashboard(procurement_id: Optional[str] = None, client: Any | None = None, limit: int = 25) -> Dict[str, Any]:
     active_client = client or _client()
-    response = (
-        active_client.table("vendor_risk_analysis")
-        .select("*")
-        .order("created_at", desc=True)
-        .limit(200)
-        .execute()
-    )
+    if procurement_id:
+        vendors_resp = active_client.table("vendors").select("id").eq("procurement_id", procurement_id).execute()
+        vendor_ids = [v["id"] for v in (vendors_resp.data or [])]
+        if not vendor_ids:
+            return {
+                "total_vendors_analyzed": 0,
+                "high_risk_vendors": 0,
+                "medium_risk_vendors": 0,
+                "low_risk_vendors": 0,
+                "average_final_risk_score": 0,
+                "assessments": [],
+                "trend": [],
+            }
+        response = (
+            active_client.table("vendor_risk_analysis")
+            .select("*, vendors(vendor_name)")
+            .in_("vendor_id", vendor_ids)
+            .order("created_at", desc=True)
+            .limit(200)
+            .execute()
+        )
+    else:
+        response = (
+            active_client.table("vendor_risk_analysis")
+            .select("*, vendors(vendor_name)")
+            .order("created_at", desc=True)
+            .limit(200)
+            .execute()
+        )
     rows = _rows(response)
 
     latest_by_vendor: Dict[str, Dict[str, Any]] = {}

@@ -4,6 +4,7 @@ import RiskAlertsPanel from '../components/RiskAlertsPanel';
 import RiskTrendVisualization from '../components/RiskTrendVisualization';
 import { getRiskDashboard } from '../api/riskApi';
 import type { RiskDashboardResponse } from '../types/risk';
+import { useProcurement } from '../context/ProcurementContext';
 
 function levelColor(level: 'low' | 'medium' | 'high') {
   if (level === 'high') return '#F87171';
@@ -12,16 +13,17 @@ function levelColor(level: 'low' | 'medium' | 'high') {
 }
 
 export default function RiskDashboard() {
+  const { selectedProcurementId } = useProcurement();
   const [dashboard, setDashboard] = useState<RiskDashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [selectedProcurementId]);
 
   async function load() {
     try {
-      const response = await getRiskDashboard();
+      const response = await getRiskDashboard(selectedProcurementId || undefined);
       setDashboard(response);
     } catch (err) {
       setError('Unable to load the risk dashboard. Create a vendor analysis first or verify the backend is running.');

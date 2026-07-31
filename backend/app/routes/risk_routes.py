@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 from ..models.risk import (
@@ -47,9 +48,9 @@ async def vendor_risk(vendor_id: str):
 
 
 @router.get("/dashboard", response_model=RiskDashboardResponse)
-async def dashboard():
+async def dashboard(procurement_id: Optional[str] = None):
     try:
-        result = await get_risk_dashboard()
+        result = await get_risk_dashboard(procurement_id=procurement_id)
         return RiskDashboardResponse(**result)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

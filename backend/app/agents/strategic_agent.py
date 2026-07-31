@@ -65,7 +65,7 @@ Rules:
 - No markdown backticks
 - No explanation before or after JSON
 - If no opportunities exist, return empty strategic_actions array with LOW priority
-- strategic_actions should be 2-5 actionable recommendations
+- strategic_actions must be an array of strings (not objects). Each string should be a concise, clear action item.
 - Each action should reference specific vendors when possible
 - Savings estimate should be realistic based on provided data
 - Reasoning should connect actions directly to the analysis data
@@ -127,7 +127,7 @@ def generate_strategic_analysis(
 
     try:
         # Initialize LLM with same parameters as quote_agent
-        llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0)
+        llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0, max_tokens=2048)
         
         # Generate prompt
         prompt = _make_strategic_prompt(renewal_data, crossdeal_data)

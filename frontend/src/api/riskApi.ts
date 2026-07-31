@@ -16,7 +16,8 @@ export async function getVendorRiskHistory(vendorId: string): Promise<Historical
   return response.data as HistoricalPerformance & { history: RiskTrendPoint[] };
 }
 
-export async function getRiskDashboard(): Promise<RiskDashboardResponse> {
-  const response = await api.get('/risk/dashboard');
+export async function getRiskDashboard(procurementId?: string): Promise<RiskDashboardResponse> {
+  const url = procurementId ? `/risk/dashboard?procurement_id=${procurementId}` : '/risk/dashboard';
+  const response = await api.get(url);
   return response.data as RiskDashboardResponse;
 }
