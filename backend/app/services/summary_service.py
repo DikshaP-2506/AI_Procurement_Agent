@@ -5,6 +5,9 @@ from ..services.strategic_service import analyze_strategic_opportunities
 from ..models.optimization import OptimizationSummary, RenewalAlert, BundleOpportunity, StrategicRecommendation
 
 
+from ..services.savings_engine import format_savings_range
+
+
 async def get_optimization_summary() -> Dict[str, Any]:
     """
     Aggregate outputs from all three optimization agents into a comprehensive summary.
@@ -97,19 +100,29 @@ async def get_optimization_summary() -> Dict[str, Any]:
                 )
             )
         
-        # Calculate overall impact
-        high_risk_count = renewal_summary.get("high_risk_count", 0)
+        # Calculate overall executive impact summary
+        high_risk_count = renewal_summary.get("high_risk_count", sum(1 for a in renewal_alerts if a.risk_level in ["HIGH", "CRITICAL"]))
         bundle_count = len(bundle_opportunities)
-        strategic_count = len(strategic_recommendations)
+        savings_val = crossdeal_summary.get("total_estimated_savings", 0)
+        savings_str = format_savings_range(savings_val) if savings_val > 0 else strategic_analysis.get("estimated_savings", "$0")
         
-        if high_risk_count > 0 and bundle_count > 0 and strategic_count > 0:
-            overall_impact = f"Identified {high_risk_count} high-risk renewals, {bundle_count} consolidation opportunities, and {strategic_count} strategic actions with total potential savings."
+        if strategic_analysis.get("business_impact"):
+            overall_impact = strategic_analysis["business_impact"]
+        elif high_risk_count > 0 and bundle_count > 0:
+            overall_impact = (
+                f"We identified {bundle_count} multi-department vendor consolidation opportunity and {high_risk_count} contracts requiring immediate attention, "
+                f"with estimated annual savings of {savings_str}. Immediate priority should focus on resolving expired contracts before executing vendor consolidation initiatives."
+            )
         elif high_risk_count > 0:
-            overall_impact = f"Identified {high_risk_count} high-risk renewals requiring immediate procurement attention."
+            overall_impact = (
+                f"We identified {high_risk_count} contracts requiring immediate attention. Immediate priority should focus on resolving critical contract renewal risks."
+            )
         elif bundle_count > 0:
-            overall_impact = f"Identified {bundle_count} cross-department consolidation opportunities for vendor negotiations."
+            overall_impact = (
+                f"We identified {bundle_count} multi-department vendor consolidation opportunity with estimated annual savings of {savings_str}."
+            )
         else:
-            overall_impact = "Procurement optimization analysis complete. Monitor contract renewals and explore bundling opportunities."
+            overall_impact = "Procurement optimization analysis complete. All active contracts are in good standing."
         
         summary = OptimizationSummary(
             total_renewal_alerts=len(renewal_alerts),

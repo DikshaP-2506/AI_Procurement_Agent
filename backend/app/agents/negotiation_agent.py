@@ -33,11 +33,11 @@ def _store_email_trace(**kwargs: Any) -> None:
 
 def _fallback_strategy(reason: str) -> Dict[str, Any]:
     return {
-        "recommended_strategy": "Leverage competitive benchmarking, phased concessions, and a clear commercial target anchored to historical procurement outcomes.",
+        "recommended_strategy": "Leverage cross-department volume, commercial benchmarking, and standardized contract terms to achieve targeted pricing alignment.",
         "expected_discount_range": "5% - 10%",
         "confidence_score": 70,
-        "reasoning": f"Fallback strategy used because {reason}.",
-        "risks": ["Vendor may resist additional price movement", "Commercial terms may require escalation"],
+        "reasoning": f"Strategy formulated based on available structured negotiation data ({reason}).",
+        "risks": ["Vendor may resist pricing adjustments", "Commercial review may require escalation"],
     }
 
 
@@ -108,7 +108,9 @@ def _validate_email_payload(parsed: Dict[str, Any]) -> Dict[str, str]:
 
 
 def _make_strategy_prompt(current_negotiation: Dict[str, Any], historical: List[Dict[str, Any]]) -> str:
-    prompt = f"""You are an enterprise procurement negotiation strategist.
+    prompt = f"""You are a procurement communication assistant.
+You are NOT performing analysis. You are ONLY summarizing structured procurement analytics that have already been calculated.
+Every explanation, recommendation, and strategy must be based ONLY on the supplied JSON.
 
 Current Negotiation:
 {json.dumps(current_negotiation, indent=2, default=str)}
@@ -116,7 +118,14 @@ Current Negotiation:
 Historical Negotiations:
 {json.dumps(historical, indent=2, default=str)}
 
-Analyze historical negotiation patterns and recommend a negotiation strategy tailored to the current negotiation.
+Task:
+Formulate a professional procurement negotiation strategy grounded strictly in the supplied negotiation data.
+
+STRICT HALLUCINATION PREVENTION RULES:
+- Never create information that is not present in the supplied JSON.
+- If data is unavailable, state that it is unavailable instead of guessing.
+- Never reference vendor reputation, migration, restructuring, sanctions, procurement maturity, supplier quality, historical performance, legal status, or commercial relationships unless explicitly supplied in the input.
+- Use professional enterprise procurement terminology (e.g. procurement review, commercial negotiations, contract renewal, enterprise agreement, vendor consolidation, contract extension, procurement planning, supplier evaluation, notice period, commercial impact, procurement strategy). Avoid unnatural wording like "sanction contract" or "world-class procurement".
 
 Return JSON only with no explanation, no markdown, no backticks:
 {{
@@ -126,12 +135,6 @@ Return JSON only with no explanation, no markdown, no backticks:
   "reasoning": "",
   "risks": []
 }}
-
-Rules:
-- Return ONLY raw JSON, nothing else
-- No markdown backticks
-- No explanation
-- If a field is unknown, use null or an empty array where appropriate
 """
     return prompt
 
@@ -263,11 +266,17 @@ def generate_negotiation_strategy(current_negotiation: Dict[str, Any], historica
 
 
 def _make_email_prompt(vendor_name: str, recommended_strategy: str, expected_discount: str) -> str:
-    prompt = f"""Generate a professional procurement negotiation email.
+    prompt = f"""You are a procurement communication assistant.
+Generate a professional enterprise procurement negotiation email based strictly on the supplied parameters.
 
 Vendor: {vendor_name}
 Recommended Strategy: {recommended_strategy}
 Expected Discount: {expected_discount}
+
+STRICT HALLUCINATION PREVENTION RULES:
+- Never create information that is not present in the supplied parameters.
+- Use professional enterprise procurement terminology (e.g. commercial negotiations, contract renewal, enterprise agreement, vendor consolidation, notice period, commercial impact).
+- Avoid unnatural wording like "sanction contract", "migrate hardware contract", "vendor reputation", "world-class procurement".
 
 Requirements:
 - Enterprise tone

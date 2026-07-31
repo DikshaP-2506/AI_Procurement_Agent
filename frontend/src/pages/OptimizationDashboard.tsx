@@ -137,7 +137,7 @@ export default function OptimizationDashboard() {
         ) : (
           <div style={{ display: "grid", gap: 28 }}>
 
-            {/* 1. AI EXECUTIVE SUMMARY */}
+            {/* 1. AI EXECUTIVE SUMMARY - What is happening? */}
             <div 
               style={{
                 background: "linear-gradient(135deg, rgba(16, 20, 38, 0.75) 0%, rgba(59, 130, 246, 0.08) 100%)",
@@ -148,8 +148,7 @@ export default function OptimizationDashboard() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <span style={{ background: "#3B82F6", color: "#FFF", fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 4, textTransform: "uppercase" }}>AI Insights</span>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Executive Summary</h3>
+                <span style={{ background: "#3B82F6", color: "#FFF", fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 4, textTransform: "uppercase" }}>AI Executive Summary — What is happening?</span>
               </div>
               
               <p style={{ color: "#E2E8F0", fontSize: 15, lineHeight: 1.6, marginBottom: 20 }}>
@@ -166,19 +165,21 @@ export default function OptimizationDashboard() {
                   <div style={{ fontSize: 20, fontWeight: 800, color: highRiskCount > 0 ? "#EF4444" : "#10B981", marginTop: 4 }}>{highRiskCount} Risky renewals</div>
                 </div>
                 <div>
-                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 600 }}>Vendor Reduction %</span>
+                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 600 }}>Target Vendor Reduction</span>
                   <div style={{ fontSize: 20, fontWeight: 800, color: "#A855F7", marginTop: 4 }}>{vendorReductionPercent}% Target</div>
                 </div>
                 <div>
-                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 600 }}>Estimated Savings</span>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: "#10B981", marginTop: 4 }}>{totalSavingsText} / Year</div>
+                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 600 }}>Estimated Annual Savings</span>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: "#10B981", marginTop: 4 }}>{totalSavingsText}</div>
                 </div>
               </div>
 
               {strategic?.strategic_actions && strategic.strategic_actions.length > 0 && (
-                <div style={{ marginTop: 20, paddingLeft: 4 }}>
-                  <span style={{ fontSize: 12, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>Recommended Action Pathway</span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                <div style={{ marginTop: 24, paddingLeft: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 12, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>Recommended Action Pathway — What should procurement do?</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {strategic.strategic_actions.map((act: string, idx: number) => (
                       <div key={idx} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13.5, color: "#CBD5E1" }}>
                         <span style={{ color: "#3B82F6", fontWeight: 800 }}>⚡</span>
@@ -193,9 +194,9 @@ export default function OptimizationDashboard() {
             {/* 2. KPI CARDS ROW */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
               {[
-                ["Optimization Score", `${optimizationScore}/100`, "#3B82F6", "Calculated overall health based on risk mitigation & consolidations."],
-                ["Confidence Score", `${confidenceScore}%`, "#A855F7", "Aggregated certainty calculation of strategic and bundle opportunities."],
-                ["Potential Savings", totalSavingsText, "#10B981", "Expected annual commercial savings from bundled volume discounts."],
+                ["Procurement Health Score", `${optimizationScore}/100`, "#3B82F6", "Calculated index: Renewal Risk exposure (40%), Vendor Consolidation (30%), Savings (30%)."],
+                ["Procurement Analysis Confidence", `${confidenceScore}%`, "#A855F7", "Combines data completeness, quote coverage & enterprise spend scale index."],
+                ["Estimated Annual Savings", totalSavingsText, "#10B981", "Projected annual commercial savings range from volume bundling & renegotiations."],
                 ["Bundle Opportunities", oppsCount, "#60A5FA", "Identified vendors active across multiple department contracts."],
                 ["Contracts At Risk", highRiskCount, "#EF4444", "Active contracts within notice period with auto-renewals enabled."]
               ].map(([label, value, color, tooltip], i) => (
@@ -224,15 +225,19 @@ export default function OptimizationDashboard() {
               ))}
             </div>
 
+
             {/* 3. CROSS DEAL & 4. RENEWAL INTELLIGENCE GRID */}
+            {/* 3. CROSS DEAL & 4. RENEWAL INTELLIGENCE GRID - What did we discover? */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))", gap: 24 }}>
               
               {/* CROSS DEAL INTELLIGENCE */}
               <div className="card-glass" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div>
-                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Cross-Deal Intelligence</h3>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <h3 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Cross-Deal Intelligence</h3>
+                  </div>
                   <p style={{ margin: "4px 0 0 0", fontSize: 12, color: "#94A3B8" }}>
-                    Bundle department procurements to unlock volume-based savings.
+                    What did we discover? Multi-department volume overlaps for master contract negotiations.
                   </p>
                 </div>
 
@@ -268,8 +273,9 @@ export default function OptimizationDashboard() {
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ fontSize: 16, fontWeight: 800, color: "#10B981" }}>
-                              ₹{o.estimated_savings_amount.toLocaleString()}
+                              ${o.estimated_savings_amount.toLocaleString()}
                             </div>
+
                             <span style={{ fontSize: 11, color: "#94A3B8" }}>
                               ({o.estimated_savings_percent}% savings)
                             </span>
@@ -282,7 +288,7 @@ export default function OptimizationDashboard() {
 
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94A3B8" }}>
                           <span>Active Procurements: <strong>{o.active_procurements}</strong></span>
-                          <span>Confidence Score: <strong style={{ color: "#A855F7" }}>{o.confidence_score}%</strong></span>
+                          <span>Analysis Confidence: <strong style={{ color: "#A855F7" }}>{o.confidence_score}%</strong></span>
                         </div>
                       </div>
                     ))
@@ -295,7 +301,7 @@ export default function OptimizationDashboard() {
                 <div>
                   <h3 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Renewal Intelligence</h3>
                   <p style={{ margin: "4px 0 0 0", fontSize: 12, color: "#94A3B8" }}>
-                    Identify high-risk contract expirations and prevent forced auto-renewals.
+                    What did we discover? Contract notice period deadlines and forced auto-renewal risk alerts.
                   </p>
                 </div>
 
@@ -355,7 +361,7 @@ export default function OptimizationDashboard() {
                         )}
 
                         <div style={{ background: "rgba(0,0,0,0.15)", padding: 10, borderRadius: 8, fontSize: 12.5, color: "#CBD5E1", borderLeft: `3px solid ${getRiskColor(r.risk_level)}` }}>
-                          <strong>Action:</strong> {r.recommendation}
+                          <strong>Action Directive:</strong> {r.recommendation}
                         </div>
                       </div>
                     ))
@@ -371,7 +377,7 @@ export default function OptimizationDashboard() {
                 <div>
                   <h3 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Strategic Consolidation Engine</h3>
                   <p style={{ margin: "4px 0 0 0", fontSize: 12, color: "#94A3B8" }}>
-                    Vendor reduction analysis and strategic consolidation actions.
+                    Vendor portfolio reduction metrics & commercial savings projections.
                   </p>
                 </div>
                 <div style={{
@@ -397,11 +403,11 @@ export default function OptimizationDashboard() {
                   <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6, color: "#60A5FA" }}>{strategic?.recommended_vendors || 2}</div>
                 </div>
                 <div style={{ background: "rgba(0,0,0,0.2)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.03)" }}>
-                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700 }}>Vendor Reduction %</span>
+                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700 }}>Target Vendor Reduction</span>
                   <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6, color: "#A855F7" }}>{vendorReductionPercent}%</div>
                 </div>
                 <div style={{ background: "rgba(0,0,0,0.2)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.03)" }}>
-                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700 }}>Annual Savings</span>
+                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700 }}>Estimated Annual Savings</span>
                   <div style={{ 
                     fontSize: String(totalSavingsText).length > 15 ? 18 : String(totalSavingsText).length > 10 ? 22 : 28, 
                     fontWeight: 800, 
@@ -412,14 +418,9 @@ export default function OptimizationDashboard() {
                   }}>{totalSavingsText}</div>
                 </div>
               </div>
-
-              <div style={{ background: "rgba(0,0,0,0.2)", padding: 20, borderRadius: 12, border: "1px solid rgba(255,255,255,0.03)" }}>
-                <strong style={{ fontSize: 13, textTransform: "uppercase", color: "#94A3B8", display: "block", marginBottom: 10 }}>Business Impact Summary</strong>
-                <p style={{ fontSize: 14, color: "#E2E8F0", lineHeight: 1.6, margin: 0 }}>
-                  {strategic?.reasoning || "Analyzed active procurements and current agreements to formulate strategic cost reduction guidelines."}
-                </p>
-              </div>
             </div>
+
+
 
             {/* 6. AGENT CONTRIBUTION PANEL */}
             <div className="card-glass">
@@ -485,14 +486,15 @@ export default function OptimizationDashboard() {
               </div>
             </div>
 
-            {/* 7. OPTIMIZATION ACTIVITY TIMELINE */}
+            {/* 7. OPTIMIZATION ACTIVITY TIMELINE - How was this generated? */}
             <div className="card-glass">
               <div>
                 <h3 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Optimization Activity Timeline</h3>
                 <p style={{ margin: "4px 0 20px 0", fontSize: 12, color: "#94A3B8" }}>
-                  Compliant audit logs recorded directly by the procurement optimization layer.
+                  How was this generated? Compliant, real-time agent audit log recorded in Supabase.
                 </p>
               </div>
+
 
               {logs.length === 0 ? (
                 <div style={{ padding: 48, textAlign: "center", color: "#94A3B8", fontStyle: "italic" }}>

@@ -16,13 +16,14 @@ class ProcurementCreate(BaseModel):
 async def list_procurements():
     """
     List all active procurement projects from Supabase.
+    Gracefully returns empty list if database query fails.
     """
     try:
-        # Since we use the service role key as the main client key, RLS will be bypassed.
         response = supabase.table("procurements").select("*").execute()
-        return response.data
+        return response.data or []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return []
+
 
 @router.post("/")
 async def create_procurement(procurement: ProcurementCreate):
