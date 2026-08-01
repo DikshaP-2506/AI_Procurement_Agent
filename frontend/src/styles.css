@@ -128,7 +128,7 @@ button {
 
 /* Premium Layout Utilities */
 .app-container {
-  max-width: 1450px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 96px 20px 48px;
   animation: fadeIn 0.4s ease-out;
@@ -228,6 +228,31 @@ button {
 
 @media (max-width: 992px) {
   .simulator-split-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* KPI Cards Responsive Grid */
+.kpi-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1200px) {
+  .kpi-cards-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .kpi-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-cards-grid {
     grid-template-columns: 1fr;
   }
 }

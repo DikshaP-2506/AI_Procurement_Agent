@@ -192,7 +192,7 @@ export default function OptimizationDashboard() {
             </div>
 
             {/* 2. KPI CARDS ROW */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+            <div className="kpi-cards-grid">
               {[
                 ["Procurement Health Score", `${optimizationScore}/100`, "#3B82F6", "Calculated index: Renewal Risk exposure (40%), Vendor Consolidation (30%), Savings (30%)."],
                 ["Procurement Analysis Confidence", `${confidenceScore}%`, "#A855F7", "Combines data completeness, quote coverage & enterprise spend scale index."],
