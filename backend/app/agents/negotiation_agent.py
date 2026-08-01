@@ -108,18 +108,43 @@ def _validate_email_payload(parsed: Dict[str, Any]) -> Dict[str, str]:
 
 
 def _make_strategy_prompt(current_negotiation: Dict[str, Any], historical: List[Dict[str, Any]]) -> str:
+    context = current_negotiation.get("current_procurement_context") if isinstance(current_negotiation, dict) and "current_procurement_context" in current_negotiation else current_negotiation
+
+    vendor_name = context.get("vendor_name") if isinstance(context, dict) else None
+    product_category = context.get("product_category") if isinstance(context, dict) else None
+    quote_value = context.get("quote_value") if isinstance(context, dict) else None
+    delivery_days = context.get("delivery_days") if isinstance(context, dict) else None
+    warranty = context.get("warranty") if isinstance(context, dict) else None
+    payment_terms = context.get("payment_terms") if isinstance(context, dict) else None
+    support_details = context.get("support_details") if isinstance(context, dict) else None
+    compliance = context.get("compliance") if isinstance(context, dict) else None
+    contract_information = context.get("contract_information") if isinstance(context, dict) else None
+
     prompt = f"""You are a procurement communication assistant.
 You are NOT performing analysis. You are ONLY summarizing structured procurement analytics that have already been calculated.
 Every explanation, recommendation, and strategy must be based ONLY on the supplied JSON.
 
-Current Negotiation:
-{json.dumps(current_negotiation, indent=2, default=str)}
+Current Procurement Context:
+{json.dumps(context, indent=2, default=str)}
 
-Historical Negotiations:
+Vendor Details:
+- Vendor Name: {vendor_name or 'Unavailable'}
+- Product Category: {product_category or 'Unavailable'}
+
+Commercial Terms:
+- Quote Value: {quote_value if quote_value is not None else 'Unavailable'}
+- Delivery Timeline: {delivery_days if delivery_days is not None else 'Unavailable'}
+- Warranty: {warranty if warranty is not None else 'Unavailable'}
+- Payment Terms: {payment_terms or 'Unavailable'}
+- Compliance: {compliance if compliance is not None else 'Unavailable'}
+- Support Details: {support_details or 'Unavailable'}
+- Contract Information: {json.dumps(contract_information, default=str) if contract_information is not None else 'Unavailable'}
+
+Relevant Historical Procurement Cases:
 {json.dumps(historical, indent=2, default=str)}
 
 Task:
-Formulate a professional procurement negotiation strategy grounded strictly in the supplied negotiation data.
+Generate a procurement negotiation strategy based on both the current procurement context and previous successful procurement cases.
 
 STRICT HALLUCINATION PREVENTION RULES:
 - Never create information that is not present in the supplied JSON.

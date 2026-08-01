@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
-import { generateNegotiationEmail, getStrategyRecommendation } from '../api/negotiationApi';
+import { generateNegotiationEmail, getStrategyRecommendation, useNegotiationStrategy } from '../api/negotiationApi';
+import { useProcurement } from '../context/ProcurementContext';
 import type {
   NegotiationEmail,
   NegotiationHistoryRecord,
@@ -8,9 +9,7 @@ import type {
 } from '../types/negotiation';
 
 export default function NegotiationIntelligence() {
-  const [vendorName, setVendorName] = useState('');
-  const [productCategory, setProductCategory] = useState('');
-  const [quoteValue, setQuoteValue] = useState('');
+  const { selectedProcurementId } = useProcurement();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,9 +22,8 @@ export default function NegotiationIntelligence() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const parsedQuote = Number(quoteValue);
-    if (!vendorName.trim() || !productCategory.trim() || !Number.isFinite(parsedQuote) || parsedQuote <= 0) {
-      setError('Enter vendor name, product category, and a valid quote value greater than 0.');
+    if (!selectedProcurementId) {
+      setError('Select a procurement project before generating negotiation intelligence.');
       return;
     }
 
@@ -38,16 +36,14 @@ export default function NegotiationIntelligence() {
 
     try {
       const strategyResponse = await getStrategyRecommendation({
-        vendor_name: vendorName.trim(),
-        product_category: productCategory.trim(),
-        quote_value: parsedQuote,
+        procurement_id: selectedProcurementId,
       });
 
       setHistorical(strategyResponse.historical || []);
       setStrategy(strategyResponse.strategy);
 
       const emailResponse = await generateNegotiationEmail({
-        vendor_name: vendorName.trim(),
+        procurement_id: selectedProcurementId,
         recommended_strategy: strategyResponse.strategy.recommended_strategy,
         expected_discount_range: strategyResponse.strategy.expected_discount_range,
       });
@@ -72,6 +68,23 @@ export default function NegotiationIntelligence() {
     }
   }
 
+  async function onUseStrategy() {
+    if (!strategy || !email || !selectedProcurementId) return;
+
+    try {
+      await useNegotiationStrategy({
+        procurement_id: selectedProcurementId,
+        recommended_strategy: strategy.recommended_strategy,
+        expected_discount_range: strategy.expected_discount_range,
+        generated_email: email,
+      });
+      setMessage({ text: 'Negotiation strategy saved as accepted procurement knowledge.', isError: false });
+      setTimeout(() => setMessage(null), 3000);
+    } catch {
+      setMessage({ text: 'Unable to save the accepted negotiation strategy.', isError: true });
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F' }}>
       <Navbar />
@@ -90,66 +103,31 @@ export default function NegotiationIntelligence() {
           </p>
         </div>
 
-        {/* Input Form */}
+        {/* Procurement Context Input */}
         <div className="card-glass" style={{ marginBottom: 24 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>Negotiation Input Form</h3>
-          <form onSubmit={onSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginTop: 16 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Vendor Name
-              </label>
-              <input
-                value={vendorName}
-                onChange={(e) => setVendorName(e.target.value)}
-                placeholder="e.g. Dell"
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Product Category
-              </label>
-              <input
-                value={productCategory}
-                onChange={(e) => setProductCategory(e.target.value)}
-                placeholder="e.g. Laptops"
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Quote Value
-              </label>
-              <input
-                value={quoteValue}
-                onChange={(e) => setQuoteValue(e.target.value)}
-                placeholder="e.g. 120000"
-                type="number"
-                min="0"
-                step="0.01"
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'end' }}>
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
-                  color: '#fff',
-                  padding: '12px',
-                  borderRadius: 10,
-                  border: 'none',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
-                  opacity: loading ? 0.7 : 1,
-                }}
-              >
-                {loading ? 'Generating...' : 'Generate Negotiation Strategy'}
-              </button>
-            </div>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>Negotiation Context</h3>
+          <div style={{ marginTop: 14, color: '#CBD5E1', fontSize: 13.5, lineHeight: 1.7 }}>
+            Negotiation intelligence now uses the currently selected procurement project and the quote data already captured by the procurement pipeline.
+          </div>
+          <form onSubmit={onSubmit} style={{ marginTop: 16 }}>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                color: '#fff',
+                padding: '12px',
+                borderRadius: 10,
+                border: 'none',
+                fontSize: 14,
+                fontWeight: 700,
+                boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? 'Generating...' : 'Generate Negotiation Strategy'}
+            </button>
           </form>
 
           {error && (
@@ -263,22 +241,40 @@ export default function NegotiationIntelligence() {
         <div className="card-glass">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#FFFFFF' }}>Negotiation Email</h3>
-            <button
-              onClick={onCopyEmail}
-              disabled={!email}
-              style={{
-                background: 'rgba(59, 130, 246, 0.12)',
-                color: '#60A5FA',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-                borderRadius: 8,
-                padding: '8px 12px',
-                fontSize: 12,
-                fontWeight: 700,
-                opacity: email ? 1 : 0.6,
-              }}
-            >
-              Copy Email
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={onUseStrategy}
+                disabled={!email || !strategy}
+                style={{
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  color: '#34D399',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: email && strategy ? 1 : 0.6,
+                }}
+              >
+                Negotiation Used
+              </button>
+              <button
+                onClick={onCopyEmail}
+                disabled={!email}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  color: '#60A5FA',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: email ? 1 : 0.6,
+                }}
+              >
+                Copy Email
+              </button>
+            </div>
           </div>
 
           {!email ? (

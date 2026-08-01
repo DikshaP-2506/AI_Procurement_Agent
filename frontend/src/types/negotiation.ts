@@ -1,7 +1,9 @@
 export interface NegotiationRequest {
-  vendor_name: string;
-  product_category: string;
-  quote_value: number;
+  procurement_id?: string;
+  quote_id?: string;
+  vendor_name?: string;
+  product_category?: string;
+  quote_value?: number;
 }
 
 export interface NegotiationHistoryRecord {
@@ -44,7 +46,22 @@ export interface NegotiationEmailResponse {
 }
 
 export interface EmailRequest {
-  vendor_name: string;
+  procurement_id?: string;
+  quote_id?: string;
+  vendor_name?: string;
   recommended_strategy: string;
   expected_discount_range: string;
+}
+
+export interface UseStrategyRequest {
+  procurement_id?: string;
+  quote_id?: string;
+  recommended_strategy: string;
+  expected_discount_range: string;
+  generated_email?: {
+    subject: string;
+    body: string;
+  };
+  risk_score?: number;
+  vendor_rank?: number;
 }

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import date
 
 
@@ -28,17 +28,33 @@ class NegotiationHistoryRecord(BaseModel):
 class NegotiationRequest(BaseModel):
     """Request payload for negotiation retrieval and strategy generation."""
 
-    vendor_name: str = Field(..., min_length=1, description="Vendor name")
-    product_category: str = Field(..., min_length=1, description="Product category")
-    quote_value: float = Field(..., gt=0, description="Current quote value")
+    procurement_id: Optional[str] = Field(default=None, description="Procurement project identifier")
+    quote_id: Optional[str] = Field(default=None, description="Quote identifier if procurement_id is unavailable")
+    vendor_name: Optional[str] = Field(default=None, description="Vendor name")
+    product_category: Optional[str] = Field(default=None, description="Product category")
+    quote_value: Optional[float] = Field(default=None, gt=0, description="Current quote value")
 
 
 class EmailRequest(BaseModel):
     """Request payload for procurement email generation."""
 
-    vendor_name: str = Field(..., description="Vendor name")
+    procurement_id: Optional[str] = Field(default=None, description="Procurement project identifier")
+    quote_id: Optional[str] = Field(default=None, description="Quote identifier if procurement_id is unavailable")
+    vendor_name: Optional[str] = Field(default=None, description="Vendor name")
     recommended_strategy: str = Field(..., description="Recommended negotiation strategy")
     expected_discount_range: str = Field(..., description="Expected discount range to use in email")
+
+
+class UseStrategyRequest(BaseModel):
+    """Request payload for saving an accepted negotiation strategy."""
+
+    procurement_id: Optional[str] = Field(default=None, description="Procurement project identifier")
+    quote_id: Optional[str] = Field(default=None, description="Quote identifier if procurement_id is unavailable")
+    recommended_strategy: str = Field(..., description="Accepted negotiation strategy")
+    expected_discount_range: str = Field(..., description="Accepted expected discount range")
+    generated_email: Optional[Dict[str, str]] = Field(default=None, description="Generated email content")
+    risk_score: Optional[float] = Field(default=None, description="Optional calculated risk score")
+    vendor_rank: Optional[float] = Field(default=None, description="Optional vendor ranking")
 
 
 class NegotiationRetrievalResponse(BaseModel):

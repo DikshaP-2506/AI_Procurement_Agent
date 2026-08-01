@@ -5,6 +5,7 @@ import type {
   NegotiationRetrievalResponse,
   NegotiationStrategyResponse,
   NegotiationEmailResponse,
+  UseStrategyRequest,
 } from '../types/negotiation';
 
 export async function retrieveNegotiations(payload: NegotiationRequest): Promise<NegotiationRetrievalResponse> {
@@ -20,4 +21,9 @@ export async function getStrategyRecommendation(payload: NegotiationRequest): Pr
 export async function generateNegotiationEmail(payload: EmailRequest): Promise<NegotiationEmailResponse> {
   const response = await api.post('/negotiation/email-generation', payload);
   return response.data as NegotiationEmailResponse;
+}
+
+export async function useNegotiationStrategy(payload: UseStrategyRequest): Promise<{ status: string; record_id?: string; fallback?: boolean }> {
+  const response = await api.post('/negotiation/use-strategy', payload);
+  return response.data as { status: string; record_id?: string; fallback?: boolean };
 }
