@@ -109,33 +109,20 @@ async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...))
             },
         }
 
-        # Prepare full payload with new fields (matching suggested schema additions)
-        full_record = record.copy()
-        full_record.update({
-            'invoice_number': clean_str(extracted_data.get('invoice_number')),
-            'quote_number': clean_str(extracted_data.get('quote_number')),
-            'gst_number': clean_str(extracted_data.get('gst_number')),
-            'currency': clean_str(extracted_data.get('currency')),
-            'quantity': clean_numeric(extracted_data.get('quantity')),
-            'unit': clean_str(extracted_data.get('unit')),
-            'warranty_period': clean_str(extracted_data.get('warranty_period')),
-            'vendor_certifications': extracted_data.get('vendor_certifications') if isinstance(extracted_data.get('vendor_certifications'), list) else [],
-            'esg_info': clean_str(extracted_data.get('esg_info')),
-            'validation_status': ai_result.get('validation_status'),
-            'duplicate_detection_status': ai_result.get('duplicate_detection_status'),
-            'missing_fields': ai_result.get('missing_fields'),
-            'normalized_values': ai_result.get('normalized_values'),
+        # Prepare payload with only the necessary new database columns (avoiding schema bloat)
+        db_record = record.copy()
+        db_record.update({
             'extraction_confidence_score': clean_numeric(ai_result.get('extraction_confidence_score')),
         })
 
         try:
-            # Try inserting the full record with all fields
-            resp = client.table('vendor_quotes').insert(full_record).execute()
+            # Try inserting the record with the confidence score and warranty years
+            resp = client.table('vendor_quotes').insert(db_record).execute()
         except Exception as e:
             error_str = str(e)
             if "column" in error_str or "does not exist" in error_str or "42703" in error_str:
-                # Table does not have the new columns yet. Fallback to insertion of core columns only.
-                print(f"Warning: New database columns not found, falling back to core columns. Error: {e}")
+                # Table does not have the new confidence column yet. Fallback to core columns.
+                print(f"Warning: Confidence column not found, falling back to core columns. Error: {e}")
                 resp = client.table('vendor_quotes').insert(record).execute()
             else:
                 raise
