@@ -152,6 +152,62 @@ EXPECTED JSON FORMAT:
 """
     return prompt
 
+def format_reasoning(val) -> str:
+    if not val:
+        return "No reasoning steps logged."
+    if isinstance(val, list):
+        return "\n".join(f"{idx+1}. {item}" for idx, item in enumerate(val))
+    if isinstance(val, dict):
+        return "\n".join(f"- **{k}**: {v}" for k, v in val.items())
+    return str(val)
+
+def format_risks(val) -> str:
+    if not val:
+        return "No risk analysis data available."
+    if isinstance(val, dict):
+        lines = []
+        for vendor, details in val.items():
+            if isinstance(details, dict):
+                score = details.get("risk_score")
+                vendor_risks = details.get("risks", [])
+                score_str = f" (Risk Score: {score}/100)" if score is not None else ""
+                lines.append(f"- **{vendor}**{score_str}:")
+                if isinstance(vendor_risks, list) and vendor_risks:
+                    for vr in vendor_risks:
+                        lines.append(f"  * {vr}")
+                elif vendor_risks:
+                    lines.append(f"  * {vendor_risks}")
+                else:
+                    lines.append("  * No critical risks identified.")
+            else:
+                lines.append(f"- **{vendor}**: {details}")
+        return "\n".join(lines)
+    if isinstance(val, list):
+        return "\n".join(f"- {item}" for item in val)
+    return str(val)
+
+def format_alternative(val) -> str:
+    if not val:
+        return "No alternative recommendations."
+    if isinstance(val, dict):
+        vendor_name = val.get("vendor_name") or val.get("recommended_vendor_name") or "Alternative Vendor"
+        tradeoffs = val.get("trade-offs") or val.get("trade_offs") or val.get("explanation")
+        if tradeoffs:
+            return f"**Alternative Winner**: **{vendor_name}**\n**Trade-offs**: {tradeoffs}"
+        return f"**Alternative Winner**: **{vendor_name}**"
+    if isinstance(val, list):
+        return "\n".join(f"- {item}" for item in val)
+    return str(val)
+
+def format_plan(val) -> str:
+    if not val:
+        return "No concrete action items planned."
+    if isinstance(val, list):
+        return "\n".join(f"- {item}" for item in val)
+    if isinstance(val, dict):
+        return "\n".join(f"- **{k}**: {v}" for k, v in val.items())
+    return str(val)
+
 
 async def get_recommendation_analysis(request: RecommendationRequest) -> RecommendationResponse:
     procurement_id = str(request.procurement_id)
@@ -604,15 +660,29 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
     agent_data = None
     if GROQ_API_KEY:
         try:
-            llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0)
-            prompt = _make_agent_prompt(proc_title, proc_desc, weights_dict, vendors_context, today_str)
-            response = llm.invoke(prompt)
-            response_text = response.content.strip()
+            import time
+            max_attempts = 3
+            attempt = 0
+            while attempt < max_attempts:
+                try:
+                    llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0, max_retries=3)
+                    prompt = _make_agent_prompt(proc_title, proc_desc, weights_dict, vendors_context, today_str)
+                    response = llm.invoke(prompt)
+                    response_text = response.content.strip()
 
-            if "```" in response_text:
-                response_text = response_text.replace("```json", "").replace("```", "").strip()
+                    if "```" in response_text:
+                        response_text = response_text.replace("```json", "").replace("```", "").strip()
 
-            agent_data = json.loads(response_text)
+                    agent_data = json.loads(response_text)
+                    break
+                except Exception as e:
+                    attempt += 1
+                    err_str = str(e)
+                    if attempt < max_attempts and ("429" in err_str or "rate limit" in err_str.lower() or "timeout" in err_str.lower()):
+                        logger.warning(f"Groq API rate limit or timeout in recommendation decision engine. Retrying in 2 seconds (attempt {attempt}/{max_attempts})...")
+                        time.sleep(2)
+                    else:
+                        raise e
         except Exception as e:
             logger.error(f"Error executing agentic reasoning: {e}")
             agent_data = None
@@ -647,15 +717,20 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
         reasoning = agent_data.get("agent_reasoning")
         plan = agent_data.get("agent_plan")
 
+        reasoning_str = format_reasoning(reasoning)
+        plan_str = format_plan(plan)
+        risks_str = format_risks(risks)
+        alt_str = format_alternative(alt_rec)
+
         agentic_summary = (
             f"### Agentic AI Recommendation Report\n\n"
             f"**Recommended Vendor**: **{recommended_name}**\n\n"
             f"#### 1. Why Selected\n{why_selected}\n\n"
             f"#### 2. Why Others Not Selected\n{why_others}\n\n"
-            f"#### 3. Agent Reasoning (Observe → Understand Intent → Reason)\n{reasoning}\n\n"
-            f"#### 4. Dynamic Procurement Plan\n{plan}\n\n"
-            f"#### 5. Identified Risks\n{risks}\n\n"
-            f"#### 6. Alternative Recommendation\n{alt_rec}\n\n"
+            f"#### 3. Agent Reasoning (Observe → Understand Intent → Reason)\n{reasoning_str}\n\n"
+            f"#### 4. Dynamic Procurement Plan\n{plan_str}\n\n"
+            f"#### 5. Identified Risks\n{risks_str}\n\n"
+            f"#### 6. Alternative Recommendation\n{alt_str}\n\n"
             f"#### 7. Dynamic Priorities & Importance\n- **Intent/Priorities**: {dyn_pri}\n- **Criterion Importance**: {crit_imp}\n\n"
             f"**Evaluation Confidence Score**: {conf_score}/1.0"
         )

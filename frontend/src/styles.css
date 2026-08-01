@@ -8,21 +8,21 @@
   --border-focus: #3b82f6;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  
+
   --primary: #3b82f6;
   --primary-hover: #2563eb;
   --primary-glow: rgba(59, 130, 246, 0.35);
-  
+
   --secondary: #8b5cf6;
   --secondary-glow: rgba(139, 92, 246, 0.25);
-  
+
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
-  
+
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   color: var(--text-main);
-  background: 
+  background:
     radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 45%),
     radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.1), transparent 40%),
     linear-gradient(180deg, #04050c 0%, #080a14 100%);
@@ -34,7 +34,9 @@
   padding: 0;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   min-height: 100%;
   background-color: var(--bg-main);
 }
@@ -51,13 +53,16 @@ body {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.2);
 }
+
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 99px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
@@ -88,7 +93,9 @@ p {
 }
 
 /* Form inputs & controls styling */
-input, select, textarea {
+input,
+select,
+textarea {
   background: rgba(0, 0, 0, 0.35);
   color: var(--text-main);
   border: 1px solid var(--border-color);
@@ -102,7 +109,9 @@ input, select, textarea {
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -119,7 +128,7 @@ button {
 
 /* Premium Layout Utilities */
 .app-container {
-  max-width: 1200px;
+  max-width: 1450px;
   margin: 0 auto;
   padding: 96px 20px 48px;
   animation: fadeIn 0.4s ease-out;
@@ -143,13 +152,27 @@ button {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes pulse-subtle {
-  0%, 100% { opacity: 0.9; }
-  50% { opacity: 0.6; }
+
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* Table Design */
@@ -192,4 +215,19 @@ button {
 
 .premium-table tr:hover td {
   background: rgba(255, 255, 255, 0.02);
+}
+
+/* Responsive Split Layout Grid for Simulator */
+.simulator-split-grid {
+  display: grid;
+  grid-template-columns: 4fr 6fr;
+  gap: 24px;
+  margin-top: 24px;
+  align-items: start;
+}
+
+@media (max-width: 992px) {
+  .simulator-split-grid {
+    grid-template-columns: 1fr;
+  }
 }

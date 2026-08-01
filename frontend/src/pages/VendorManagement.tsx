@@ -8,6 +8,7 @@ import { useProcurement } from '../context/ProcurementContext';
 export default function VendorManagement() {
   const { selectedProcurementId } = useProcurement();
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [form, setForm] = useState<VendorCreate>({ procurement_id: selectedProcurementId, vendor_name: '', contact_person: '', email: '', phone: '', country: '' });
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -68,107 +69,164 @@ export default function VendorManagement() {
         {/* Form and List Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, marginTop: 16 }}>
           
-          {/* Add Vendor Form */}
-          <div className="card-glass" style={{ height: 'fit-content' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: '#FFFFFF' }}>
-              Add Supplier
-            </h3>
+          {/* LEFT COLUMN: Add Supplier Form + Insights Card */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             
-            <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <input 
-                  required
-                  placeholder="Vendor Name (e.g. Apple Inc)" 
-                  value={form.vendor_name} 
-                  onChange={e => setForm({ ...form, vendor_name: e.target.value })} 
-                />
-              </div>
+            {/* Add Vendor Form */}
+            <div className="card-glass" style={{ height: 'fit-content' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: '#FFFFFF' }}>
+                Add Supplier
+              </h3>
               
-              <div>
-                <input 
-                  required
-                  placeholder="Contact Person (e.g. John Doe)" 
-                  value={form.contact_person} 
-                  onChange={e => setForm({ ...form, contact_person: e.target.value })} 
-                />
-              </div>
-              
-              <div>
-                <input 
-                  required
-                  type="email"
-                  placeholder="Email Address (e.g. sales@vendor.com)" 
-                  value={form.email} 
-                  onChange={e => setForm({ ...form, email: e.target.value })} 
-                />
-              </div>
-              
-              <div>
-                <input 
-                  required
-                  placeholder="Phone Number (e.g. +1 555-0199)" 
-                  value={form.phone} 
-                  onChange={e => setForm({ ...form, phone: e.target.value })} 
-                />
-              </div>
-              
-              <div>
-                <input 
-                  required
-                  placeholder="Country (e.g. United States)" 
-                  value={form.country} 
-                  onChange={e => setForm({ ...form, country: e.target.value })} 
-                />
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={submitting}
-                style={{ 
-                  background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', 
-                  color: '#fff', 
-                  padding: '12px', 
-                  borderRadius: 10, 
-                  border: 'none',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  marginTop: 8,
-                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
-                  opacity: submitting ? 0.7 : 1
-                }}
-              >
-                {submitting ? 'Registering...' : 'Register Vendor'}
-              </button>
-
-              {message && (
-                <div style={{ 
-                  marginTop: 10, 
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  background: message.isError ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-                  border: `1px solid ${message.isError ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
-                  color: message.isError ? '#FCA5A5' : '#D1FAE5'
-                }}>
-                  {message.text}
+              <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <input 
+                    required
+                    placeholder="Vendor Name (e.g. Apple Inc)" 
+                    value={form.vendor_name} 
+                    onChange={e => setForm({ ...form, vendor_name: e.target.value })} 
+                  />
                 </div>
-              )}
-            </form>
+                
+                <div>
+                  <input 
+                    required
+                    placeholder="Contact Person (e.g. John Doe)" 
+                    value={form.contact_person} 
+                    onChange={e => setForm({ ...form, contact_person: e.target.value })} 
+                  />
+                </div>
+                
+                <div>
+                  <input 
+                    required
+                    type="email"
+                    placeholder="Email Address (e.g. sales@vendor.com)" 
+                    value={form.email} 
+                    onChange={e => setForm({ ...form, email: e.target.value })} 
+                  />
+                </div>
+                
+                <div>
+                  <input 
+                    required
+                    placeholder="Phone Number (e.g. +1 555-0199)" 
+                    value={form.phone} 
+                    onChange={e => setForm({ ...form, phone: e.target.value })} 
+                  />
+                </div>
+                
+                <div>
+                  <input 
+                    required
+                    placeholder="Country (e.g. United States)" 
+                    value={form.country} 
+                    onChange={e => setForm({ ...form, country: e.target.value })} 
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={submitting}
+                  style={{ 
+                    background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', 
+                    color: '#fff', 
+                    padding: '12px', 
+                    borderRadius: 10, 
+                    border: 'none',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    marginTop: 8,
+                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+                    opacity: submitting ? 0.7 : 1
+                  }}
+                >
+                  {submitting ? 'Registering...' : 'Register Vendor'}
+                </button>
+
+                {message && (
+                  <div style={{ 
+                    marginTop: 10, 
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    background: message.isError ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                    border: `1px solid ${message.isError ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
+                    color: message.isError ? '#FCA5A5' : '#D1FAE5'
+                  }}>
+                    {message.text}
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Supplier Directory Insights */}
+            <div className="card-glass" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
+                Supplier Database Insights
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                  <div style={{ color: '#94A3B8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Suppliers</div>
+                  <div style={{ color: '#60A5FA', fontSize: 24, fontWeight: 850, marginTop: 4, lineHeight: 1 }}>{vendors.length}</div>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                  <div style={{ color: '#94A3B8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Global Coverage</div>
+                  <div style={{ color: '#34D399', fontSize: 24, fontWeight: 850, marginTop: 4, lineHeight: 1 }}>
+                    {new Set(vendors.map(v => v.country?.trim().toLowerCase()).filter(Boolean)).size} {new Set(vendors.map(v => v.country?.trim().toLowerCase()).filter(Boolean)).size === 1 ? 'Country' : 'Countries'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           {/* Vendors List */}
-          <div className="card-glass" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
-              Registered suppliers ({vendors.length})
-            </h3>
+          <div className="card-glass" style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 600 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
+                Registered suppliers ({vendors.length})
+              </h3>
+            </div>
+
+            {/* Real-time search filter */}
+            <div style={{ position: 'relative' }}>
+              <input 
+                type="text"
+                placeholder="Search by supplier name, contact, or country..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  paddingLeft: 38,
+                  fontSize: 13,
+                  height: 38,
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                }}
+              />
+              <svg style={{ position: 'absolute', left: 14, top: 12, width: 14, height: 14, color: '#94A3B8' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', maxHeight: 520, paddingRight: 4 }}>
-              {vendors.length === 0 ? (
-                <div style={{ color: '#6B7280', textAlign: 'center', padding: '48px 0', fontSize: 14 }}>
-                  No suppliers registered yet.
-                </div>
-              ) : (
-                vendors.map(v => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', flex: 1, paddingRight: 4 }}>
+              {(() => {
+                const filtered = vendors.filter(v => 
+                  v.vendor_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  (v.country && v.country.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                  (v.contact_person && v.contact_person.toLowerCase().includes(searchQuery.toLowerCase()))
+                );
+                
+                if (filtered.length === 0) {
+                  return (
+                    <div style={{ color: '#6B7280', textAlign: 'center', padding: '48px 0', fontSize: 14 }}>
+                      {vendors.length === 0 ? 'No suppliers registered yet.' : 'No matching suppliers found.'}
+                    </div>
+                  );
+                }
+
+                return filtered.map(v => (
                   <div 
                     key={v.id} 
                     style={{ 
@@ -237,8 +295,8 @@ export default function VendorManagement() {
                       </Link>
                     </div>
                   </div>
-                ))
-              )}
+                ));
+              })()}
             </div>
           </div>
 

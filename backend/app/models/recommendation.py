@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from uuid import UUID
 
 class RecommendationWeights(BaseModel):
@@ -64,11 +64,11 @@ class RecommendationResponse(BaseModel):
     recommended_vendor: Optional[str] = None
     why_selected: Optional[str] = None
     why_others_not_selected: Optional[str] = None
-    dynamic_priorities: Optional[str] = None
-    criterion_importance: Optional[str] = None
+    dynamic_priorities: Optional[Any] = None
+    criterion_importance: Optional[Any] = None
     confidence_score: Optional[float] = None
-    missing_information: Optional[List[str]] = None
-    risks: Optional[str] = None
-    alternative_recommendations: Optional[str] = None
-    agent_reasoning: Optional[str] = None
-    agent_plan: Optional[str] = None
+    missing_information: Optional[List[Any]] = None
+    risks: Optional[Any] = None
+    alternative_recommendations: Optional[Any] = None
+    agent_reasoning: Optional[Any] = None
+    agent_plan: Optional[Any] = None
