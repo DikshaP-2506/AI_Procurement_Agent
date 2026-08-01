@@ -40,28 +40,106 @@ async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...))
         # extract text
         text = extract_text_from_pdf(contents)
 
+        # Fetch existing quotes for this vendor to perform duplicate check
+        existing_quotes = []
+        try:
+            eq_resp = client.table("vendor_quotes").select("id, invoice_number, quote_number, extracted_json").eq("vendor_id", vendor_id).execute()
+            existing_quotes = eq_resp.data or []
+        except Exception:
+            try:
+                eq_resp = client.table("vendor_quotes").select("*").eq("vendor_id", vendor_id).execute()
+                existing_quotes = eq_resp.data or []
+            except Exception as eq_err2:
+                print(f"Warning: Failed to fetch existing quotes for duplicate check: {eq_err2}")
+
         # Call AI agent to extract structured fields (passing current date as baseline)
         from datetime import datetime
         today_str = datetime.now().date().isoformat()
-        ai_result = extract_quote_data(text, today_str)
+        ai_result = extract_quote_data(text, today_str, existing_quotes=existing_quotes)
+
+        # Extract flat dictionary for database insertions & backward-compatible return values
+        extracted_data = ai_result.get('extracted_data', {})
+
+        # Safe casting functions to prevent database column insertion type errors
+        def clean_numeric(val):
+            if val == "Data Not Available" or val is None:
+                return None
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return None
+
+        def clean_int(val, default=None):
+            if val == "Data Not Available" or val is None:
+                return default
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return default
+
+        def clean_str(val, default=None):
+            if val == "Data Not Available" or val is None:
+                return default
+            return str(val)
+
+        def clean_bool(val, default=True):
+            if val == "Data Not Available" or val is None:
+                return default
+            if isinstance(val, bool):
+                return val
+            if str(val).lower() in ("true", "1", "yes"):
+                return True
+            if str(val).lower() in ("false", "0", "no"):
+                return False
+            return default
 
         # insert into vendor_quotes including AI-extracted fields (always insert, multiple quotes allowed)
         record = {
             'vendor_id': vendor_id,
             'quote_file_url': public_url,
-            'price': ai_result.get('price'),
-            'delivery_days': ai_result.get('delivery_days'),
-            'warranty_years': ai_result.get('warranty_years'),
-            'support_level': ai_result.get('support_level'),
-            'payment_terms': ai_result.get('payment_terms'),
-            'compliance_score': ai_result.get('compliance_score'),
+            'price': clean_numeric(extracted_data.get('price')),
+            'delivery_days': clean_numeric(extracted_data.get('delivery_days')),
+            'warranty_years': clean_numeric(extracted_data.get('warranty_years')),
+            'support_level': clean_str(extracted_data.get('support_level')),
+            'payment_terms': clean_str(extracted_data.get('payment_terms')),
+            'compliance_score': clean_numeric(extracted_data.get('compliance_score')),
             'extracted_json': {
                 'raw_text': text,
                 'full_ai_result': ai_result,
             },
         }
-        
-        resp = client.table('vendor_quotes').insert(record).execute()
+
+        # Prepare full payload with new fields (matching suggested schema additions)
+        full_record = record.copy()
+        full_record.update({
+            'invoice_number': clean_str(extracted_data.get('invoice_number')),
+            'quote_number': clean_str(extracted_data.get('quote_number')),
+            'gst_number': clean_str(extracted_data.get('gst_number')),
+            'currency': clean_str(extracted_data.get('currency')),
+            'quantity': clean_numeric(extracted_data.get('quantity')),
+            'unit': clean_str(extracted_data.get('unit')),
+            'warranty_period': clean_str(extracted_data.get('warranty_period')),
+            'vendor_certifications': extracted_data.get('vendor_certifications') if isinstance(extracted_data.get('vendor_certifications'), list) else [],
+            'esg_info': clean_str(extracted_data.get('esg_info')),
+            'validation_status': ai_result.get('validation_status'),
+            'duplicate_detection_status': ai_result.get('duplicate_detection_status'),
+            'missing_fields': ai_result.get('missing_fields'),
+            'normalized_values': ai_result.get('normalized_values'),
+            'extraction_confidence_score': clean_numeric(ai_result.get('extraction_confidence_score')),
+        })
+
+        try:
+            # Try inserting the full record with all fields
+            resp = client.table('vendor_quotes').insert(full_record).execute()
+        except Exception as e:
+            error_str = str(e)
+            if "column" in error_str or "does not exist" in error_str or "42703" in error_str:
+                # Table does not have the new columns yet. Fallback to insertion of core columns only.
+                print(f"Warning: New database columns not found, falling back to core columns. Error: {e}")
+                resp = client.table('vendor_quotes').insert(record).execute()
+            else:
+                raise
+
         if not resp.data:
             raise HTTPException(status_code=500, detail='Failed to insert quote record')
         inserted = resp.data[0]
@@ -70,7 +148,7 @@ async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...))
         # Automatically insert or update a contract record in 'contracts' table with the dates
         try:
             # Personalize contract name if default was returned
-            contract_name = ai_result.get('contract_name', 'Vendor Agreement')
+            contract_name = clean_str(extracted_data.get('contract_name'), 'Vendor Agreement')
             if contract_name == "Vendor Agreement":
                 current_year = datetime.now().year
                 contract_name = f"{vendor_name} Agreement {current_year}"
@@ -78,11 +156,11 @@ async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...))
             contract_payload = {
                 "vendor_id": vendor_id,
                 "contract_name": contract_name,
-                "start_date": ai_result.get("start_date") or today_str,
-                "end_date": ai_result.get("end_date"),
-                "renewal_date": ai_result.get("renewal_date"),
-                "auto_renewal": ai_result.get("auto_renewal", True),
-                "notice_period_days": int(ai_result.get("notice_period_days", 30))
+                "start_date": clean_str(extracted_data.get("start_date"), today_str),
+                "end_date": clean_str(extracted_data.get("end_date")),
+                "renewal_date": clean_str(extracted_data.get("renewal_date")),
+                "auto_renewal": clean_bool(extracted_data.get("auto_renewal"), True),
+                "notice_period_days": clean_int(extracted_data.get("notice_period_days"), 30)
             }
 
             # Check if vendor already has an existing contract
@@ -135,7 +213,12 @@ async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...))
             'vendor_id': vendor_id,
             'quote_id': quote_id,
             'text_preview': text[:200],
-            'extracted_data': ai_result,
+            'extracted_data': extracted_data,
+            'validation_status': ai_result.get('validation_status'),
+            'duplicate_detection_status': ai_result.get('duplicate_detection_status'),
+            'missing_fields': ai_result.get('missing_fields'),
+            'normalized_values': ai_result.get('normalized_values'),
+            'extraction_confidence_score': ai_result.get('extraction_confidence_score'),
         }
     except HTTPException:
         raise

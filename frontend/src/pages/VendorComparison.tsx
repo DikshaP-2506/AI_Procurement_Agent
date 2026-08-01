@@ -14,7 +14,7 @@ export default function VendorComparison() {
   const [quotesMap, setQuotesMap] = useState<Record<string, VendorQuote[]>>({});
 
   // Simulator-specific state
-  const [weights, setWeights] = useState<Weights>({ cost: 25, risk: 25, support: 25, delivery: 25 });
+  const [weights, setWeights] = useState<Weights>({ cost: 20, risk: 20, support: 20, delivery: 20, warranty: 10, esg: 10 });
   const [qualitativeAdjustments, setQualitativeAdjustments] = useState<Record<string, number>>({});
   const [rankedRecommendations, setRankedRecommendations] = useState<VendorRecommendation[]>([]);
   const [comparisonSummary, setComparisonSummary] = useState<string>('');
@@ -104,15 +104,19 @@ export default function VendorComparison() {
   // Preset Handlers
   const applyPreset = (presetName: string) => {
     if (presetName === 'cost') {
-      setWeights({ cost: 70, risk: 10, support: 10, delivery: 10 });
+      setWeights({ cost: 60, risk: 10, support: 10, delivery: 10, warranty: 5, esg: 5 });
     } else if (presetName === 'risk') {
-      setWeights({ cost: 10, risk: 70, support: 10, delivery: 10 });
+      setWeights({ cost: 10, risk: 60, support: 10, delivery: 10, warranty: 5, esg: 5 });
     } else if (presetName === 'support') {
-      setWeights({ cost: 10, risk: 10, support: 70, delivery: 10 });
+      setWeights({ cost: 10, risk: 10, support: 60, delivery: 10, warranty: 5, esg: 5 });
     } else if (presetName === 'delivery') {
-      setWeights({ cost: 10, risk: 10, support: 10, delivery: 70 });
+      setWeights({ cost: 10, risk: 10, support: 10, delivery: 60, warranty: 5, esg: 5 });
+    } else if (presetName === 'warranty') {
+      setWeights({ cost: 10, risk: 10, support: 10, delivery: 10, warranty: 55, esg: 5 });
+    } else if (presetName === 'esg') {
+      setWeights({ cost: 10, risk: 10, support: 10, delivery: 10, warranty: 5, esg: 55 });
     } else {
-      setWeights({ cost: 25, risk: 25, support: 25, delivery: 25 });
+      setWeights({ cost: 20, risk: 20, support: 20, delivery: 20, warranty: 10, esg: 10 });
     }
   };
 
@@ -231,7 +235,7 @@ export default function VendorComparison() {
               Trade-Off Weights
             </h2>
             <p style={{ color: '#94A3B8', fontSize: 13, marginBottom: 20 }}>
-              Adjust sliders to balance procurement priorities. Sum: {weights.cost + weights.risk + weights.support + weights.delivery}%
+              Adjust sliders to balance procurement priorities. Sum: {weights.cost + weights.risk + weights.support + weights.delivery + (weights.warranty || 0) + (weights.esg || 0)}%
             </p>
 
             {/* Presets Grid */}
@@ -243,9 +247,9 @@ export default function VendorComparison() {
                 <button 
                   onClick={() => applyPreset('cost')}
                   style={{
-                    background: weights.cost === 70 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0, 0, 0, 0.25)',
-                    border: `1px solid ${weights.cost === 70 ? '#3B82F6' : 'rgba(255, 255, 255, 0.08)'}`,
-                    color: weights.cost === 70 ? '#60A5FA' : '#94A3B8',
+                    background: weights.cost === 60 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                    border: `1px solid ${weights.cost === 60 ? '#3B82F6' : 'rgba(255, 255, 255, 0.08)'}`,
+                    color: weights.cost === 60 ? '#60A5FA' : '#94A3B8',
                     padding: '10px 12px',
                     borderRadius: 8,
                     fontSize: 12,
@@ -259,9 +263,9 @@ export default function VendorComparison() {
                 <button 
                   onClick={() => applyPreset('risk')}
                   style={{
-                    background: weights.risk === 70 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 0, 0, 0.25)',
-                    border: `1px solid ${weights.risk === 70 ? '#10B981' : 'rgba(255, 255, 255, 0.08)'}`,
-                    color: weights.risk === 70 ? '#34D399' : '#94A3B8',
+                    background: weights.risk === 60 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                    border: `1px solid ${weights.risk === 60 ? '#10B981' : 'rgba(255, 255, 255, 0.08)'}`,
+                    color: weights.risk === 60 ? '#34D399' : '#94A3B8',
                     padding: '10px 12px',
                     borderRadius: 8,
                     fontSize: 12,
@@ -275,9 +279,9 @@ export default function VendorComparison() {
                 <button 
                   onClick={() => applyPreset('delivery')}
                   style={{
-                    background: weights.delivery === 70 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0, 0, 0, 0.25)',
-                    border: `1px solid ${weights.delivery === 70 ? '#F59E0B' : 'rgba(255, 255, 255, 0.08)'}`,
-                    color: weights.delivery === 70 ? '#FBBF24' : '#94A3B8',
+                    background: weights.delivery === 60 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                    border: `1px solid ${weights.delivery === 60 ? '#F59E0B' : 'rgba(255, 255, 255, 0.08)'}`,
+                    color: weights.delivery === 60 ? '#FBBF24' : '#94A3B8',
                     padding: '10px 12px',
                     borderRadius: 8,
                     fontSize: 12,
@@ -289,11 +293,43 @@ export default function VendorComparison() {
                   Fast Delivery
                 </button>
                 <button 
+                  onClick={() => applyPreset('warranty')}
+                  style={{
+                    background: weights.warranty === 55 ? 'rgba(236, 72, 153, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                    border: `1px solid ${weights.warranty === 55 ? '#EC4899' : 'rgba(255, 255, 255, 0.08)'}`,
+                    color: weights.warranty === 55 ? '#F472B6' : '#94A3B8',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Long Warranty
+                </button>
+                <button 
+                  onClick={() => applyPreset('esg')}
+                  style={{
+                    background: weights.esg === 55 ? 'rgba(20, 184, 166, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                    border: `1px solid ${weights.esg === 55 ? '#14B8A6' : 'rgba(255, 255, 255, 0.08)'}`,
+                    color: weights.esg === 55 ? '#2DD4BF' : '#94A3B8',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Sustainable ESG
+                </button>
+                <button 
                   onClick={() => applyPreset('balanced')}
                   style={{
-                    background: (weights.cost === 25 && weights.risk === 25) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(0, 0, 0, 0.25)',
-                    border: `1px solid ${(weights.cost === 25 && weights.risk === 25) ? '#8B5CF6' : 'rgba(255, 255, 255, 0.08)'}`,
-                    color: (weights.cost === 25 && weights.risk === 25) ? '#A78BFA' : '#94A3B8',
+                    background: (weights.cost === 20 && weights.risk === 20) ? 'rgba(139, 92, 246, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                    border: `1px solid ${(weights.cost === 20 && weights.risk === 20) ? '#8B5CF6' : 'rgba(255, 255, 255, 0.08)'}`,
+                    color: (weights.cost === 20 && weights.risk === 20) ? '#A78BFA' : '#94A3B8',
                     padding: '10px 12px',
                     borderRadius: 8,
                     fontSize: 12,
@@ -366,6 +402,34 @@ export default function VendorComparison() {
                 />
               </div>
 
+              {/* Warranty Weight */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ color: '#E2E8F0', fontWeight: 600 }}>Warranty Weight</span>
+                  <span style={{ color: '#EC4899', fontWeight: 700 }}>{weights.warranty || 0}%</span>
+                </div>
+                <input 
+                  type="range" min="0" max="100" step="5"
+                  value={weights.warranty || 0}
+                  onChange={e => handleWeightChange('warranty', Number(e.target.value))}
+                  style={{ accentColor: '#EC4899', cursor: 'pointer', width: '100%' }}
+                />
+              </div>
+
+              {/* ESG Weight */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ color: '#E2E8F0', fontWeight: 600 }}>ESG Sustainability Weight</span>
+                  <span style={{ color: '#14B8A6', fontWeight: 700 }}>{weights.esg || 0}%</span>
+                </div>
+                <input 
+                  type="range" min="0" max="100" step="5"
+                  value={weights.esg || 0}
+                  onChange={e => handleWeightChange('esg', Number(e.target.value))}
+                  style={{ accentColor: '#14B8A6', cursor: 'pointer', width: '100%' }}
+                />
+              </div>
+
             </div>
 
             {apiWarning && (
@@ -393,7 +457,7 @@ export default function VendorComparison() {
                 const rawRisk = Number(vendor.breakdown.risk.raw);
                 const rawSupport = String(vendor.breakdown.support.raw);
 
-                return (
+                 return (
                   <div 
                     key={vendor.vendor_id}
                     style={{
@@ -425,6 +489,25 @@ export default function VendorComparison() {
                       RANK #{vendor.rank}
                     </div>
 
+                    {/* Confidence Score Badge */}
+                    {vendor.confidence_score !== undefined && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        right: 0,
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                        color: vendor.confidence_score >= 0.8 ? '#34D399' : vendor.confidence_score >= 0.5 ? '#FBBF24' : '#FCA5A5',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '5px 12px',
+                        borderBottomLeftRadius: 10
+                      }}>
+                        Confidence: {Math.round(vendor.confidence_score * 100)}%
+                      </div>
+                    )}
+
                     {/* Vendor title and final score */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 18 }}>
                       <div style={{ marginLeft: 4 }}>
@@ -438,6 +521,21 @@ export default function VendorComparison() {
                         <span style={{ fontSize: 10, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Total Score</span>
                       </div>
                     </div>
+
+                    {/* Missing Details Banner */}
+                    {vendor.missing_information && vendor.missing_information.length > 0 && (
+                      <div style={{
+                        marginBottom: 16,
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        background: 'rgba(239, 68, 68, 0.05)',
+                        border: '1px solid rgba(239, 68, 68, 0.15)',
+                        color: '#FCA5A5',
+                        fontSize: 12
+                      }}>
+                        <strong>Missing Details:</strong> {vendor.missing_information.join(', ')}
+                      </div>
+                    )}
 
                     {/* Normalization Progress Bars (Uniform layout in single stack) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
@@ -486,6 +584,28 @@ export default function VendorComparison() {
                         </div>
                       </div>
 
+                      {/* Warranty bar */}
+                      <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.03)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#E2E8F0', marginBottom: 6, gap: 12 }}>
+                          <span>Warranty: <strong style={{ color: '#FFFFFF' }}>{vendor.breakdown.warranty?.raw || 'Data Not Available'}</strong></span>
+                          <span style={{ color: '#EC4899', fontWeight: 600 }}>Score: {vendor.breakdown.warranty?.score ?? 0}</span>
+                        </div>
+                        <div style={{ height: 6, background: 'rgba(255, 255, 255, 0.06)', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${vendor.breakdown.warranty?.score ?? 0}%`, background: 'linear-gradient(90deg, #EC4899 0%, #F472B6 100%)', borderRadius: 99 }} />
+                        </div>
+                      </div>
+
+                      {/* ESG Sustainability bar */}
+                      <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255, 255, 255, 0.03)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#E2E8F0', marginBottom: 6, gap: 12 }}>
+                          <span>ESG / Sustainability: <strong style={{ color: '#FFFFFF' }}>{vendor.breakdown.esg?.raw || 'Data Not Available'}</strong></span>
+                          <span style={{ color: '#14B8A6', fontWeight: 600 }}>Score: {vendor.breakdown.esg?.score ?? 0}</span>
+                        </div>
+                        <div style={{ height: 6, background: 'rgba(255, 255, 255, 0.06)', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${vendor.breakdown.esg?.score ?? 0}%`, background: 'linear-gradient(90deg, #14B8A6 0%, #2DD4BF 100%)', borderRadius: 99 }} />
+                        </div>
+                      </div>
+
                     </div>
 
                     {/* Qualitative Adjustment Offset slider */}
@@ -524,8 +644,8 @@ export default function VendorComparison() {
 
                     {/* Action Panel */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                      <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>
-                        W. Contribution: Cost {vendor.breakdown.cost.weighted} | Risk {vendor.breakdown.risk.weighted} | Support {vendor.breakdown.support.weighted} | Deliv {vendor.breakdown.delivery.weighted}
+                      <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic', maxWidth: '65%' }}>
+                        W. Contribution: Cost {vendor.breakdown.cost.weighted} | Risk {vendor.breakdown.risk.weighted} | Support {vendor.breakdown.support.weighted} | Deliv {vendor.breakdown.delivery.weighted} | Warr {vendor.breakdown.warranty?.weighted ?? 0} | ESG {vendor.breakdown.esg?.weighted ?? 0}
                       </span>
                       <button 
                         onClick={() => setSelectedVendorForApply(vendor)}

@@ -7,6 +7,8 @@ class RecommendationWeights(BaseModel):
     risk: float = Field(..., description="Weight for risk slider, between 0 and 100")
     support: float = Field(..., description="Weight for support slider, between 0 and 100")
     delivery: float = Field(..., description="Weight for delivery slider, between 0 and 100")
+    warranty: Optional[float] = Field(default=0.0, description="Weight for warranty, between 0 and 100")
+    esg: Optional[float] = Field(default=0.0, description="Weight for ESG, between 0 and 100")
 
 class RecommendationRequest(BaseModel):
     procurement_id: UUID = Field(..., description="ID of the procurement process")
@@ -26,6 +28,8 @@ class ScoreBreakdown(BaseModel):
     risk: ScoreComponent
     support: ScoreComponent
     delivery: ScoreComponent
+    warranty: Optional[ScoreComponent] = None
+    esg: Optional[ScoreComponent] = None
 
 class VendorRecommendation(BaseModel):
     vendor_id: str
@@ -35,6 +39,8 @@ class VendorRecommendation(BaseModel):
     breakdown: ScoreBreakdown
     explanation: str
     qualitative_adjustment: float = Field(default=0.0)
+    missing_information: Optional[List[str]] = Field(default_factory=list)
+    confidence_score: Optional[float] = Field(default=1.0)
 
 class ApplyRecommendationRequest(BaseModel):
     procurement_id: UUID
@@ -53,3 +59,16 @@ class RecommendationResponse(BaseModel):
     recommendations: List[VendorRecommendation]
     comparison_summary: str
     warning: Optional[str] = None
+    
+    # Agentic AI Recommendation Fields
+    recommended_vendor: Optional[str] = None
+    why_selected: Optional[str] = None
+    why_others_not_selected: Optional[str] = None
+    dynamic_priorities: Optional[str] = None
+    criterion_importance: Optional[str] = None
+    confidence_score: Optional[float] = None
+    missing_information: Optional[List[str]] = None
+    risks: Optional[str] = None
+    alternative_recommendations: Optional[str] = None
+    agent_reasoning: Optional[str] = None
+    agent_plan: Optional[str] = None

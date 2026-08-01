@@ -5,6 +5,8 @@ export interface Weights {
   risk: number;
   support: number;
   delivery: number;
+  warranty?: number;
+  esg?: number;
 }
 
 export interface ScoreComponent {
@@ -18,6 +20,8 @@ export interface ScoreBreakdown {
   risk: ScoreComponent;
   support: ScoreComponent;
   delivery: ScoreComponent;
+  warranty?: ScoreComponent;
+  esg?: ScoreComponent;
 }
 
 export interface VendorRecommendation {
@@ -28,12 +32,27 @@ export interface VendorRecommendation {
   breakdown: ScoreBreakdown;
   explanation: string;
   qualitative_adjustment: number;
+  missing_information?: string[];
+  confidence_score?: number;
 }
 
 export interface RecommendationResponse {
   recommendations: VendorRecommendation[];
   comparison_summary: string;
   warning?: string;
+  
+  // Agentic AI Recommendation Fields
+  recommended_vendor?: string;
+  why_selected?: string;
+  why_others_not_selected?: string;
+  dynamic_priorities?: string;
+  criterion_importance?: string;
+  confidence_score?: number;
+  missing_information?: string[];
+  risks?: string;
+  alternative_recommendations?: string;
+  agent_reasoning?: string;
+  agent_plan?: string;
 }
 
 export interface ApplyRecommendationResponse {
