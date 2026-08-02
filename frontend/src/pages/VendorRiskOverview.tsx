@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import RiskAlertsPanel from '../components/RiskAlertsPanel';
 import RiskTrendVisualization from '../components/RiskTrendVisualization';
 import { analyzeVendorRisk, getVendorRisk, getVendorRiskHistory } from '../api/riskApi';
-import { getVendors } from '../api/vendorApi';
+import { getVendors, API_BASE } from '../api/vendorApi';
 import type { RiskAssessment, RiskTrendPoint } from '../types/risk';
 import { useProcurement } from '../context/ProcurementContext';
 
@@ -77,7 +77,7 @@ export default function VendorRiskOverview() {
         if (typeof detail === 'string' && detail.trim()) {
           setError(detail);
         } else if (err.code === 'ERR_NETWORK') {
-          setError('Unable to reach the backend at http://127.0.0.1:8000. Make sure the API is running.');
+          setError(`Unable to reach the backend at ${API_BASE}. Make sure the API is running.`);
         } else {
           setError(`Unable to load vendor risk data (${err.response?.status ?? 'unknown error'}).`);
         }

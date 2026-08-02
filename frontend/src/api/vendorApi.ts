@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { VendorCreate, Vendor, VendorQuote } from '../types/vendor';
 
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || 'http://127.0.0.1:8000';
+
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000',
+  baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -47,3 +49,5 @@ export async function getVendorQuotes(vendorId: string): Promise<VendorQuote[]> 
 }
 
 export default api;
+
+export { API_BASE };
