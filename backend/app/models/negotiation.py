@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Dict, Union
 from datetime import date
 
 
@@ -11,8 +11,8 @@ class NegotiationHistoryRecord(BaseModel):
     negotiation_date: Optional[date] = None
     discount_requested: Optional[float] = None
     discount_received: Optional[float] = None
-    successful_tactics: Optional[str] = None
-    failed_tactics: Optional[str] = None
+    successful_tactics: Optional[Union[str, List[str]]] = None
+    failed_tactics: Optional[Union[str, List[str]]] = None
     outcome: Optional[str] = None
     notes: Optional[str] = None
     created_at: Optional[str] = None
@@ -24,12 +24,22 @@ class NegotiationHistoryRecord(BaseModel):
     negotiation_rounds: Optional[int] = None
     success_score: Optional[float] = None
 
+    @field_validator("successful_tactics", "failed_tactics", mode="before")
+    @classmethod
+    def normalize_tactics(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return ", ".join(str(item).strip() for item in value if str(item).strip())
+        return str(value).strip()
+
 
 class NegotiationRequest(BaseModel):
     """Request payload for negotiation retrieval and strategy generation."""
 
     procurement_id: Optional[str] = Field(default=None, description="Procurement project identifier")
     quote_id: Optional[str] = Field(default=None, description="Quote identifier if procurement_id is unavailable")
+    vendor_id: Optional[str] = Field(default=None, description="Vendor identifier used as the primary negotiation context key")
     vendor_name: Optional[str] = Field(default=None, description="Vendor name")
     product_category: Optional[str] = Field(default=None, description="Product category")
     quote_value: Optional[float] = Field(default=None, gt=0, description="Current quote value")
@@ -40,6 +50,7 @@ class EmailRequest(BaseModel):
 
     procurement_id: Optional[str] = Field(default=None, description="Procurement project identifier")
     quote_id: Optional[str] = Field(default=None, description="Quote identifier if procurement_id is unavailable")
+    vendor_id: Optional[str] = Field(default=None, description="Vendor identifier used as the primary negotiation context key")
     vendor_name: Optional[str] = Field(default=None, description="Vendor name")
     recommended_strategy: str = Field(..., description="Recommended negotiation strategy")
     expected_discount_range: str = Field(..., description="Expected discount range to use in email")
@@ -50,6 +61,7 @@ class UseStrategyRequest(BaseModel):
 
     procurement_id: Optional[str] = Field(default=None, description="Procurement project identifier")
     quote_id: Optional[str] = Field(default=None, description="Quote identifier if procurement_id is unavailable")
+    vendor_id: Optional[str] = Field(default=None, description="Vendor identifier used as the primary negotiation context key")
     recommended_strategy: str = Field(..., description="Accepted negotiation strategy")
     expected_discount_range: str = Field(..., description="Accepted expected discount range")
     generated_email: Optional[Dict[str, str]] = Field(default=None, description="Generated email content")

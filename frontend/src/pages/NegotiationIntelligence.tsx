@@ -216,23 +216,6 @@ export default function NegotiationIntelligence() {
                 <div style={{ marginTop: 8, color: '#CBD5E1', fontSize: 13.5, lineHeight: 1.6 }}>{strategy.reasoning}</div>
               </div>
 
-              <div style={{ background: 'rgba(0, 0, 0, 0.2)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 14, gridColumn: '1 / -1' }}>
-                <div style={{ color: '#94A3B8', fontSize: 11, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Risks</div>
-                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {(strategy.risks || []).length > 0 ? (
-                    strategy.risks.map((risk, index) => (
-                      <span
-                        key={`${risk}-${index}`}
-                        style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#FCA5A5', padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600 }}
-                      >
-                        {risk}
-                      </span>
-                    ))
-                  ) : (
-                    <span style={{ color: '#94A3B8', fontSize: 13 }}>No specific risks provided.</span>
-                  )}
-                </div>
-              </div>
             </div>
           )}
         </div>
