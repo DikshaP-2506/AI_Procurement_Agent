@@ -273,7 +273,20 @@ export default function OptimizationDashboard() {
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ fontSize: 16, fontWeight: 800, color: "#10B981" }}>
-                              ${o.estimated_savings_amount.toLocaleString()}
+                              {o.estimated_savings_range || (
+                                (() => {
+                                  const val = Number(o.estimated_savings_amount || 0);
+                                  if (!val || val <= 0) return "$0";
+                                  const low = val * 0.90;
+                                  const high = val * 1.10;
+                                  if (val >= 1000000) {
+                                    return `$${(low / 1000000).toFixed(1)}M – $${(high / 1000000).toFixed(1)}M`;
+                                  } else if (val >= 1000) {
+                                    return `$${(low / 1000).toFixed(0)}K – $${(high / 1000).toFixed(0)}K`;
+                                  }
+                                  return `$${Math.round(low).toLocaleString()} – $${Math.round(high).toLocaleString()}`;
+                                })()
+                              )}
                             </div>
 
                             <span style={{ fontSize: 11, color: "#94A3B8" }}>

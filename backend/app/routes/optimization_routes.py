@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from ..models.optimization import (
     RenewalAnalysisResponse,
@@ -10,6 +11,8 @@ from ..services.renewal_service import get_renewal_analysis
 from ..services.crossdeal_service import get_crossdeal_analysis
 from ..services.strategic_service import analyze_strategic_opportunities
 from ..services.summary_service import get_optimization_summary
+
+logger = logging.getLogger("uvicorn.error")
 
 router = APIRouter(
     prefix="/optimization",
@@ -96,7 +99,12 @@ async def strategic_analysis(request: StrategicAnalysisRequest):
 @router.get("/strategic-analysis", response_model=StrategicAnalysisResponse)
 async def get_strategic_analysis():
     try:
-        analyses, summary_dict = await get_renewal_analysis()
+        import asyncio
+        (analyses, summary_dict), (opportunities, crossdeal_summary_dict) = await asyncio.gather(
+            get_renewal_analysis(),
+            get_crossdeal_analysis()
+        )
+        
         renewal_data = {
             "total_contracts": summary_dict.get("total_contracts", 0),
             "high_risk_count": summary_dict.get("high_risk_count", 0),
@@ -105,7 +113,6 @@ async def get_strategic_analysis():
             "contracts": [c.model_dump() for c in analyses] if analyses else []
         }
         
-        opportunities, crossdeal_summary_dict = await get_crossdeal_analysis()
         crossdeal_data = {
             "total_vendors_analyzed": crossdeal_summary_dict.get("total_vendors_analyzed", 0),
             "vendors_with_opportunities": crossdeal_summary_dict.get("vendors_with_opportunities", 0),

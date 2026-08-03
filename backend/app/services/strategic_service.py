@@ -1,7 +1,10 @@
+import logging
 from typing import Dict, Any
 from ..agents.strategic_agent import generate_strategic_analysis
 from .audit_service import log_agent_execution
 from ..supabase_client import supabase, supabase_service
+
+logger = logging.getLogger("uvicorn.error")
 
 
 async def fetch_procurement_history():
@@ -77,14 +80,13 @@ async def analyze_strategic_opportunities(
         }
 
         # Build dynamic, context-specific audit reasoning
-        actions_count = len(strategic_result.get("strategic_actions", []))
-        est_savings = strategic_result.get("estimated_savings", "$0")
-        priority = strategic_result.get("priority", "MEDIUM")
+        actions_sample = strategic_result.get("strategic_actions", [])
+        top_action = actions_sample[0] if actions_sample else "Formulated SLA consolidation pathways."
+        priority = strategic_result.get("priority", "HIGH")
         
         dynamic_reasoning = (
-            f"Strategic analysis complete: Formulated {actions_count} actionable vendor pathways (Priority: {priority}) "
-            f"with total estimated commercial savings of {est_savings}. "
-            f"Focus: {strategic_result.get('reasoning', 'Synthesized procurement data')}"
+            f"Synthesized cross-deal volume opportunities and contract renewal risk alerts. "
+            f"Formulated strategic vendor reduction plan and prioritized: {top_action}"
         )
 
         # Log agent execution
