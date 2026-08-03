@@ -3,8 +3,7 @@ import json
 from typing import Dict, Any, List
 
 from langchain_groq import ChatGroq
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+from ..services.groq_key_manager import get_next_groq_key
 TRACE_NEGOTIATION_EMAIL = os.getenv("NEGOTIATION_EMAIL_TRACE", "1") == "1"
 
 _LAST_STRATEGY_TRACE: Dict[str, Any] = {}
@@ -184,7 +183,9 @@ def generate_negotiation_strategy(current_negotiation: Dict[str, Any], historica
         )
         return fallback
 
-    if not GROQ_API_KEY:
+    # rotate and obtain a key; if none configured, fall back
+    _key = get_next_groq_key()
+    if not _key:
         _store_strategy_trace(
             prompt=_make_strategy_prompt(current_negotiation, historical),
             raw_llm_response="",
@@ -197,7 +198,7 @@ def generate_negotiation_strategy(current_negotiation: Dict[str, Any], historica
         return default
 
     try:
-        llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0)
+        llm = ChatGroq(api_key=_key, model="llama-3.1-8b-instant", temperature=0)
         prompt = _make_strategy_prompt(current_negotiation, historical)
         response = llm.invoke(prompt)
         response_text = response.content.strip()
@@ -322,7 +323,9 @@ def generate_negotiation_email(vendor_name: str, recommended_strategy: str, expe
     """Generate email subject and body for negotiation outreach."""
     default = _fallback_email(vendor_name, recommended_strategy, expected_discount)
 
-    if not GROQ_API_KEY:
+    # rotate and obtain a key for email generation
+    _key = get_next_groq_key()
+    if not _key:
         _store_email_trace(
             prompt=_make_email_prompt(vendor_name, recommended_strategy, expected_discount),
             raw_llm_response="",
@@ -335,7 +338,7 @@ def generate_negotiation_email(vendor_name: str, recommended_strategy: str, expe
         return default
 
     try:
-        llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0)
+        llm = ChatGroq(api_key=_key, model="llama-3.1-8b-instant", temperature=0)
         prompt = _make_email_prompt(vendor_name, recommended_strategy, expected_discount)
         print("[Negotiation Email] Prompt sent to Groq:")
         print(prompt)

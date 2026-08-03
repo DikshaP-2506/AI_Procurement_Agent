@@ -5,6 +5,8 @@ import os
 import json
 from datetime import datetime
 from langchain_groq import ChatGroq
+from .groq_key_manager import get_next_groq_key
+from ..config import GROQ_API_KEYS
 from ..supabase_client import supabase, supabase_service
 from ..models.recommendation import (
     RecommendationWeights,
@@ -21,7 +23,7 @@ from .audit_service import log_agent_execution
 import logging
 
 logger = logging.getLogger("uvicorn.error")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Note: GROQ API keys will be rotated via get_next_groq_key()
 
 
 # Mapping support level strings to numerical scores
@@ -658,14 +660,17 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
     today_str = datetime.now().date().isoformat()
 
     agent_data = None
-    if GROQ_API_KEY:
+    if GROQ_API_KEYS:
         try:
             import time
             max_attempts = 3
             attempt = 0
             while attempt < max_attempts:
                 try:
-                    llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0, max_retries=3)
+                    key = get_next_groq_key()
+                    if not key:
+                        raise RuntimeError("No GROQ API key available")
+                    llm = ChatGroq(api_key=key, model="llama-3.1-8b-instant", temperature=0, max_retries=3)
                     prompt = _make_agent_prompt(proc_title, proc_desc, weights_dict, vendors_context, today_str)
                     response = llm.invoke(prompt)
                     response_text = response.content.strip()

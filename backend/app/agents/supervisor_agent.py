@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 from langchain_groq import ChatGroq
-from ..config import GROQ_API_KEY
+from ..services.groq_key_manager import get_next_groq_key
 from ..supabase_client import supabase_service, supabase
 from ..services.memory_service import write_observation, read_observation, clear_observations, get_all_observations
 from .quote_agent import extract_quote_data
@@ -140,7 +140,9 @@ async def run_supervisor_agent(instruction: str, context: Optional[Dict[str, Any
     # Clear previous board observations
     clear_observations()
     
-    if not GROQ_API_KEY:
+    # check for at least one configured key
+    _key = get_next_groq_key()
+    if not _key:
         return "Supervisor Agent active: Groq API Key is not configured."
         
     plan = []
@@ -149,7 +151,10 @@ async def run_supervisor_agent(instruction: str, context: Optional[Dict[str, Any
     attempt = 0
     while attempt < max_attempts:
         try:
-            llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0, max_retries=3)
+            key = get_next_groq_key()
+            if not key:
+                raise RuntimeError("No GROQ API key available")
+            llm = ChatGroq(api_key=key, model="llama-3.1-8b-instant", temperature=0, max_retries=3)
             response = llm.invoke([
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"User Request: {instruction}"}
@@ -215,7 +220,10 @@ Observations written to Shared Memory during execution:
 
 Summarize these findings into a clean, professional, and comprehensive natural language response for the user. Highlight the key results from each sub-agent (extracting quotes, checking risk, strategic bundling, negotiation strategy/email) as relevant.
 """
-            llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0, max_retries=3)
+            key = get_next_groq_key()
+            if not key:
+                raise RuntimeError("No GROQ API key available")
+            llm = ChatGroq(api_key=key, model="llama-3.1-8b-instant", temperature=0, max_retries=3)
             response = llm.invoke(summary_prompt)
             summary = response.content.strip()
             break

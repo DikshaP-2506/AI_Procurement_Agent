@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from langchain_groq import ChatGroq
-from ..config import GROQ_API_KEY
+from ..services.groq_key_manager import get_next_groq_key
 from ..services.savings_engine import format_savings_range
 
 
@@ -174,7 +174,9 @@ def generate_strategic_analysis(
    else:
        generate_strategic_analysis._cache = {}
 
-   if not GROQ_API_KEY:
+   # rotate and obtain a key
+   _key = get_next_groq_key()
+   if not _key:
        return default_response
 
    try:
@@ -183,7 +185,10 @@ def generate_strategic_analysis(
        attempt = 0
        while attempt < max_attempts:
            try:
-               llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0.0, max_tokens=512, max_retries=3, request_timeout=5.0)
+               _key = get_next_groq_key()
+               if not _key:
+                   raise RuntimeError("No GROQ API key available")
+               llm = ChatGroq(api_key=_key, model="llama-3.1-8b-instant", temperature=0.0, max_tokens=512, max_retries=3, request_timeout=5.0)
                prompt = _make_strategic_prompt(renewal_data, crossdeal_data)
                
                response = llm.invoke(prompt)

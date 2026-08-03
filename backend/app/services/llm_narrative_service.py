@@ -4,7 +4,7 @@ import hashlib
 import time
 from typing import List, Dict, Any, Tuple
 from langchain_groq import ChatGroq
-from ..config import GROQ_API_KEY
+from ..services.groq_key_manager import get_next_groq_key
 from ..models.optimization import RenewalRiskAnalysis, DealOpportunity
 
 logger = logging.getLogger("uvicorn.error")
@@ -27,11 +27,12 @@ def _set_cache(key: str, value: Any):
 
 
 def _get_llm() -> ChatGroq | None:
-    if not GROQ_API_KEY:
+    key = get_next_groq_key()
+    if not key:
         return None
     try:
         return ChatGroq(
-            api_key=GROQ_API_KEY,
+            api_key=key,
             model="llama-3.1-8b-instant",
             temperature=0.2,
             max_tokens=2048

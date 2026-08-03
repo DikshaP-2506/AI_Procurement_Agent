@@ -4,8 +4,7 @@ import re
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
 from langchain_groq import ChatGroq
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+from ..services.groq_key_manager import get_next_groq_key
 
 
 def _make_prompt(raw_text: str, today_str: str) -> str:
@@ -370,11 +369,12 @@ def extract_quote_data(raw_text: str, today_str: str = None, existing_quotes: Li
         "extraction_confidence_score": 0.0
     }
 
-    if not GROQ_API_KEY:
+    key = get_next_groq_key()
+    if not key:
         return default_res
 
     try:
-        llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0)
+        llm = ChatGroq(api_key=key, model="llama-3.1-8b-instant", temperature=0)
         prompt = _make_prompt(raw_text, today_str)
 
         response = llm.invoke(prompt)
