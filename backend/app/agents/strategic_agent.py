@@ -178,31 +178,17 @@ def generate_strategic_analysis(
        return default_response
 
    try:
-       parsed = None
-       max_attempts = 3
-       attempt = 0
-       while attempt < max_attempts:
-           try:
-               llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0.0, max_tokens=512, max_retries=3, request_timeout=5.0)
-               prompt = _make_strategic_prompt(renewal_data, crossdeal_data)
-               
-               response = llm.invoke(prompt)
-               response_text = response.content.strip()
-              
-               if "```" in response_text:
-                   response_text = response_text.replace("```json", "").replace("```", "").strip()
-              
-               parsed = json.loads(response_text)
-               break
-           except Exception as e:
-               attempt += 1
-               err_str = str(e)
-               if attempt < max_attempts and ("429" in err_str or "rate limit" in err_str.lower() or "timeout" in err_str.lower()):
-                   logger.warning(f"Groq API rate limit or timeout in strategic agent. Retrying in 2 seconds (attempt {attempt}/{max_attempts})...")
-                   time.sleep(2)
-               else:
-                   raise e
+       llm = ChatGroq(api_key=GROQ_API_KEY, model="llama-3.1-8b-instant", temperature=0.0, max_tokens=512, max_retries=2, request_timeout=15.0)
+       prompt = _make_strategic_prompt(renewal_data, crossdeal_data)
+       
+       response = llm.invoke(prompt)
+       response_text = response.content.strip()
       
+       if "```" in response_text:
+           response_text = response_text.replace("```json", "").replace("```", "").strip()
+      
+       parsed = json.loads(response_text)
+  
        import re
        parsed_est_savings = parsed.get("estimated_savings", "")
        nums = re.findall(r'\d[\d,]*', parsed_est_savings)

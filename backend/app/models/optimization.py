@@ -69,6 +69,7 @@ class DealOpportunity(BaseModel):
     total_procurement_value: float = Field(description="Total value across all departments")
     estimated_savings_percent: int = Field(description="Estimated savings percentage")
     estimated_savings_amount: float = Field(description="Estimated savings in currency")
+    estimated_savings_range: Optional[str] = Field(default=None, description="Formatted estimated savings range")
     recommendation: str
     confidence_score: float = Field(default=85.0, description="Confidence score from 0 to 100")
 

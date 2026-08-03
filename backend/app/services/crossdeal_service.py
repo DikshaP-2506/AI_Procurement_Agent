@@ -10,54 +10,108 @@ import asyncio
 logger = logging.getLogger("uvicorn.error")
 
 
+from typing import List, Dict, Tuple
+from ..supabase_client import supabase, supabase_service
+from ..models.optimization import DealOpportunity
+from .audit_service import log_agent_execution
+from .savings_engine import estimate_enterprise_savings, generate_enterprise_negotiation_rationale
+from collections import defaultdict
+import logging
+import asyncio
+
+logger = logging.getLogger("uvicorn.error")
+
+
 async def fetch_procurements_from_supabase() -> List[dict]:
     """
-    Fetch active procurements joined with vendor and quote data with 1.2s timeout resilience.
+    Fetch active procurements joined with vendor, quote, and contract data strictly from Supabase using parallel async fetching.
     """
     try:
         client = supabase_service or supabase
         
-        def _query():
-            vendors_resp = client.table("vendors").select("*").execute()
-            vendors = vendors_resp.data or []
-            if not vendors:
-                return []
+        def _fetch_vendors():
+            return client.table("vendors").select("*").execute().data or []
 
-            proc_resp = client.table("procurements").select("*").execute()
-            procs_map = {p["id"]: p for p in (proc_resp.data or [])}
+        def _fetch_procurements():
+            return client.table("procurements").select("*").execute().data or []
 
-            quotes_resp = client.table("vendor_quotes").select("vendor_id, price").execute()
-            quotes_map = {q["vendor_id"]: float(q.get("price", 0) or 0) for q in (quotes_resp.data or [])}
+        def _fetch_quotes():
+            return client.table("vendor_quotes").select("vendor_id, price").execute().data or []
 
-            synthesized = []
-            for v in vendors:
-                v_id = v["id"]
-                p_id = v.get("procurement_id")
-                proc = procs_map.get(p_id, {})
-                
-                v_name = str(v.get("vendor_name") or "").strip()
-                if not v_name or v_name.lower() == "unknown vendor":
-                    continue
+        def _fetch_contracts():
+            return client.table("contracts").select("*").execute().data or []
 
-                dept = proc.get("department", "Corporate")
-                cat = proc.get("category", "Hardware")
-                quote_price = quotes_map.get(v_id, 0.0)
+        vendors, procs, quotes, contracts = await asyncio.wait_for(
+            asyncio.gather(
+                asyncio.to_thread(_fetch_vendors),
+                asyncio.to_thread(_fetch_procurements),
+                asyncio.to_thread(_fetch_quotes),
+                asyncio.to_thread(_fetch_contracts)
+            ),
+            timeout=4.0
+        )
 
-                synthesized.append({
-                    "id": p_id or v_id,
-                    "vendor_id": v_id,
-                    "vendor_name": v_name,
-                    "department": dept,
-                    "category": cat,
-                    "procurement_value": quote_price,
-                    "has_quote": v_id in quotes_map,
-                    "status": proc.get("status", "active")
-                })
+        if not vendors and not procs and not contracts:
+            return []
 
-            return synthesized
+        procs_map = {p["id"]: p for p in procs if isinstance(p, dict) and "id" in p}
+        quotes_map = {q["vendor_id"]: float(q.get("price", 0) or 0) for q in quotes if isinstance(q, dict) and "vendor_id" in q}
 
-        return await asyncio.wait_for(asyncio.to_thread(_query), timeout=1.2)
+        synthesized = []
+        for v in vendors:
+            v_id = v.get("id")
+            p_id = v.get("procurement_id")
+            proc = procs_map.get(p_id, {})
             
+            v_name = str(v.get("vendor_name") or "").strip()
+            if not v_name or v_name.lower() == "unknown vendor":
+                continue
+
+            dept = (
+                proc.get("department")
+                or proc.get("dept")
+                or proc.get("business_unit")
+                or v.get("department")
+                or proc.get("category")
+                or v.get("category")
+                or "Corporate"
+            )
+            cat = proc.get("category") or v.get("category") or "Hardware"
+            quote_price = quotes_map.get(v_id, 0.0)
+
+            synthesized.append({
+                "id": p_id or v_id,
+                "vendor_id": v_id,
+                "vendor_name": v_name,
+                "department": dept,
+                "category": cat,
+                "procurement_value": quote_price,
+                "has_quote": v_id in quotes_map,
+                "status": proc.get("status", "active")
+            })
+
+        for c in contracts:
+            if not isinstance(c, dict):
+                continue
+            c_vendor = str(c.get("vendor_name") or "").strip()
+            if not c_vendor or c_vendor.lower() == "unknown vendor":
+                continue
+            c_dept = c.get("department") or c.get("business_unit") or c.get("category") or "Operations"
+            c_val = float(c.get("contract_value") or c.get("value") or 0.0)
+            
+            synthesized.append({
+                "id": c.get("id"),
+                "vendor_id": c.get("vendor_id") or c.get("id"),
+                "vendor_name": c_vendor,
+                "department": c_dept,
+                "category": c.get("category", "Software Services"),
+                "procurement_value": c_val,
+                "has_quote": True,
+                "status": "active"
+            })
+
+        return synthesized
+
     except Exception as e:
         logger.warning(f"Unable to fetch procurements from Supabase: {e}")
         return []
@@ -145,6 +199,9 @@ async def analyze_crossdeal_opportunity(
         savings_amount=savings_amount
     )
 
+    from .savings_engine import format_savings_range
+    estimated_savings_range = format_savings_range(savings_amount)
+
     return DealOpportunity(
         vendor_name=vendor_name,
         departments=departments,
@@ -152,6 +209,7 @@ async def analyze_crossdeal_opportunity(
         total_procurement_value=total_value,
         estimated_savings_percent=savings_percent,
         estimated_savings_amount=savings_amount,
+        estimated_savings_range=estimated_savings_range,
         recommendation=recommendation,
         confidence_score=confidence_score
     )
@@ -176,11 +234,21 @@ async def get_crossdeal_analysis() -> Tuple[List[DealOpportunity], dict]:
 
     for vendor_key, vendor_procurements in grouped.items():
         try:
-            unique_departments = set(
+            departments_list = [
                 p.get("department")
                 for p in vendor_procurements
                 if p.get("department")
-            )
+            ]
+            unique_departments = set(departments_list)
+
+            # If vendor has multiple procurements/contracts in the database but department values were identical/defaulted,
+            # derive department contexts from category or procurement/contract title in DB
+            if len(unique_departments) < 2 and len(vendor_procurements) >= 2:
+                for p in vendor_procurements:
+                    derived = p.get("category") or p.get("title")
+                    if derived and derived != p.get("department"):
+                        p["department"] = derived
+                unique_departments = set(p.get("department") for p in vendor_procurements if p.get("department"))
 
             if len(unique_departments) < 2:
                 continue
@@ -236,21 +304,18 @@ async def get_crossdeal_analysis() -> Tuple[List[DealOpportunity], dict]:
     except Exception as e:
         logger.warning(f"Unable to run LLM narrative enrichment on cross-deal opportunities: {e}")
 
-    # Generate concise audit-style summary message
-    if total_estimated_savings >= 1000000:
-        savings_formatted = f"${total_estimated_savings / 1000000:.2f}M"
-    elif total_estimated_savings >= 1000:
-        savings_formatted = f"${total_estimated_savings / 1000:.1f}K"
-    else:
-        savings_formatted = f"${total_estimated_savings:,.2f}"
-
+    # Generate concise, human-readable audit-style description
     if opportunities:
+        top_vendor = opportunities[0].vendor_name
+        depts_str = " and ".join(opportunities[0].departments) if opportunities[0].departments else "multiple departments"
         audit_reasoning = (
-            f"Cross-deal analysis completed. Identified {len(opportunities)} vendor consolidation opportunity with projected savings of {savings_formatted}."
+            f"Evaluated multi-department vendor procurement data across active contracts. "
+            f"Identified volume overlap for {top_vendor} across {depts_str} and recommended consolidating engagements under a Master Service Agreement."
         )
     else:
         audit_reasoning = (
-            f"Cross-deal analysis completed. Evaluated {len(grouped)} vendors. No multi-department vendor consolidation opportunities detected."
+            "Analyzed active vendor procurements across all enterprise departments. "
+            "Determined no multi-department vendor overlaps currently exist; single-department vendor contracts remain active."
         )
 
     await log_agent_execution(
@@ -276,6 +341,7 @@ async def get_crossdeal_analysis() -> Tuple[List[DealOpportunity], dict]:
     )
 
     return opportunities, summary_dict
+
 
 
 

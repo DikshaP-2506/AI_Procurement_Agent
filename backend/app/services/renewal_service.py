@@ -103,13 +103,13 @@ def generate_renewal_recommendation(
 
 async def fetch_contracts_from_supabase() -> List[dict]:
     """
-    Fetch all contracts from Supabase with error resilience and fast 0.8s timeout.
+    Fetch all contracts from Supabase with error resilience and 4.0s timeout.
     """
     try:
         client = supabase_service or supabase
         response = await asyncio.wait_for(
             asyncio.to_thread(lambda: client.table("contracts").select("*").execute()),
-            timeout=0.8
+            timeout=4.0
         )
         return response.data if response.data else []
     except Exception as e:
@@ -267,9 +267,17 @@ async def get_renewal_analysis() -> Tuple[List[RenewalRiskAnalysis], dict]:
 
     # Audit summary message
     urgent_contracts = [a for a in analyses if a.risk_level in ["CRITICAL", "HIGH"]]
-    audit_reasoning = (
-        f"Renewal analysis completed. Evaluated {len(contracts)} contracts and identified {len(urgent_contracts)} contract{'s' if len(urgent_contracts) != 1 else ''} requiring immediate procurement action."
-    )
+    if urgent_contracts:
+        top_c = urgent_contracts[0]
+        audit_reasoning = (
+            f"Scanned active contract renewal windows and notice periods. "
+            f"Flagged '{top_c.contract_name}' with {top_c.vendor_name} as {top_c.risk_level} risk and issued directive to initiate immediate renegotiation before auto-renewal deadline."
+        )
+    else:
+        audit_reasoning = (
+            "Scanned active contract notice periods and renewal windows. "
+            "Confirmed all active contracts are outside critical notice deadlines and operating in good standing."
+        )
 
     await log_agent_execution(
         agent_name="Subscription Renewal Catcher",

@@ -9,9 +9,9 @@ from ..models.optimization import RenewalRiskAnalysis, DealOpportunity
 
 logger = logging.getLogger("uvicorn.error")
 
-# Fast 60-second TTL cache for LLM responses to eliminate page reload latency
+# Fast 300-second TTL cache for LLM responses to eliminate page reload latency
 _CACHE: Dict[str, Tuple[float, Any]] = {}
-CACHE_TTL = 60.0
+CACHE_TTL = 300.0
 
 
 def _get_cache(key: str):
@@ -34,7 +34,7 @@ def _get_llm() -> ChatGroq | None:
             api_key=GROQ_API_KEY,
             model="llama-3.1-8b-instant",
             temperature=0.2,
-            max_tokens=2048
+            max_tokens=1024
         )
     except Exception as e:
         logger.warning(f"Unable to initialize ChatGroq LLM: {e}")
@@ -46,6 +46,7 @@ async def enrich_renewal_analyses_with_llm(analyses: List[RenewalRiskAnalysis]) 
     Enrich deterministic renewal risk analysis objects with personalized, LLM-generated recommendations and explanations.
     Uses in-memory caching for zero latency on frequent page loads.
     """
+    import asyncio
     if not analyses:
         return []
 
@@ -101,7 +102,10 @@ STRICT RULES TO PREVENT HALLUCINATION:
 """
 
     try:
-        response = llm.invoke(prompt)
+        response = await asyncio.wait_for(
+            asyncio.to_thread(llm.invoke, prompt),
+            timeout=15.0
+        )
         content = response.content.strip()
         if "```" in content:
             content = content.replace("```json", "").replace("```", "").strip()
@@ -118,7 +122,7 @@ STRICT RULES TO PREVENT HALLUCINATION:
                         a.explainability = str(item["explainability"]).strip()
             _set_cache(cache_key, analyses)
     except Exception as e:
-        logger.warning(f"LLM renewal narrative enrichment fallback triggered: {e}")
+        logger.warning(f"LLM renewal narrative enrichment fallback triggered: {type(e).__name__} - {e}")
 
     return analyses
 
@@ -128,6 +132,7 @@ async def enrich_crossdeal_opportunities_with_llm(opportunities: List[DealOpport
     Enrich deterministic cross-deal bundle opportunities with customized, LLM-generated negotiation rationale.
     Uses in-memory caching for ultra-fast performance.
     """
+    import asyncio
     if not opportunities:
         return []
 
@@ -177,7 +182,10 @@ STRICT RULES TO PREVENT HALLUCINATION:
 """
 
     try:
-        response = llm.invoke(prompt)
+        response = await asyncio.wait_for(
+            asyncio.to_thread(llm.invoke, prompt),
+            timeout=15.0
+        )
         content = response.content.strip()
         if "```" in content:
             content = content.replace("```json", "").replace("```", "").strip()
@@ -192,7 +200,7 @@ STRICT RULES TO PREVENT HALLUCINATION:
                         o.recommendation = str(item["recommendation"]).strip()
             _set_cache(cache_key, opportunities)
     except Exception as e:
-        logger.warning(f"LLM crossdeal narrative enrichment fallback triggered: {e}")
+        logger.warning(f"LLM crossdeal narrative enrichment fallback triggered: {type(e).__name__} - {e}")
 
     return opportunities
 
