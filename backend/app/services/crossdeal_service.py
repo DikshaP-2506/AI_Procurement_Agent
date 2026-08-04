@@ -22,10 +22,18 @@ import asyncio
 logger = logging.getLogger("uvicorn.error")
 
 
+_PROCUREMENTS_CACHE = {"timestamp": 0.0, "data": []}
+
 async def fetch_procurements_from_supabase() -> List[dict]:
     """
     Fetch active procurements joined with vendor, quote, and contract data strictly from Supabase using parallel async fetching.
     """
+    import time
+    now = time.time()
+
+    if now - _PROCUREMENTS_CACHE["timestamp"] < 30.0:
+        return _PROCUREMENTS_CACHE["data"]
+        
     try:
         client = supabase_service or supabase
         
@@ -110,6 +118,8 @@ async def fetch_procurements_from_supabase() -> List[dict]:
                 "status": "active"
             })
 
+        _PROCUREMENTS_CACHE["timestamp"] = now
+        _PROCUREMENTS_CACHE["data"] = synthesized
         return synthesized
 
     except Exception as e:
@@ -215,7 +225,7 @@ async def analyze_crossdeal_opportunity(
     )
 
 
-async def get_crossdeal_analysis() -> Tuple[List[DealOpportunity], dict]:
+async def get_crossdeal_analysis(skip_ai: bool = False) -> Tuple[List[DealOpportunity], dict]:
     """
     Analyze procurements for cross-deal negotiation opportunities.
     """
@@ -298,11 +308,12 @@ async def get_crossdeal_analysis() -> Tuple[List[DealOpportunity], dict]:
     }
 
     # Enrich bundle recommendations using grounded LLM presentation layer
-    try:
-        from .llm_narrative_service import enrich_crossdeal_opportunities_with_llm
-        opportunities = await enrich_crossdeal_opportunities_with_llm(opportunities)
-    except Exception as e:
-        logger.warning(f"Unable to run LLM narrative enrichment on cross-deal opportunities: {e}")
+    if not skip_ai:
+        try:
+            from .llm_narrative_service import enrich_crossdeal_opportunities_with_llm
+            opportunities = await enrich_crossdeal_opportunities_with_llm(opportunities)
+        except Exception as e:
+            logger.warning(f"Unable to run LLM narrative enrichment on cross-deal opportunities: {e}")
 
     # Generate concise, human-readable audit-style description
     if opportunities:

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Vendor, VendorQuote } from '../types/vendor';
-import { getVendors, getVendorQuotes } from '../api/vendorApi';
+import { getVendors, getVendorQuotes, getQuotesForProcurement } from '../api/vendorApi';
 import { getRecommendations, applyRecommendation, Weights, VendorRecommendation, RecommendationResponse } from '../api/recommendationApi';
 import Navbar from '../components/Navbar';
 import { useProcurement } from '../context/ProcurementContext';
@@ -38,11 +38,73 @@ export default function VendorComparison() {
     }
   }, [selectedProcurementId]);
 
-  // Fetch recommendations whenever weights, qualitative adjustments, or selected project change
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+
   useEffect(() => {
-    if (selectedProcurementId) {
-      fetchSimulatedRankings();
+    if (!selectedProcurementId) return;
+
+    let isMounted = true;
+    
+    // 1. Fetch fast mathematical rankings immediately
+    async function fetchFastRankings() {
+      try {
+        const res = await getRecommendations(selectedProcurementId!, weights, qualitativeAdjustments, true);
+        if (isMounted) {
+          setRankedRecommendations(res.recommendations);
+          // Preserve old AI summary if we have one, otherwise use the rule-based fallback
+          setRecommendationData(prev => {
+            if (prev) {
+              return {
+                ...res,
+                comparison_summary: prev.comparison_summary,
+                recommended_vendor: prev.recommended_vendor,
+                why_selected: prev.why_selected,
+                why_others_not_selected: prev.why_others_not_selected,
+                dynamic_priorities: prev.dynamic_priorities,
+                criterion_importance: prev.criterion_importance,
+                confidence_score: prev.confidence_score,
+                risks: prev.risks,
+                alternative_recommendations: prev.alternative_recommendations,
+                agent_reasoning: prev.agent_reasoning,
+                agent_plan: prev.agent_plan
+              };
+            }
+            return res;
+          });
+          setApiWarning(res.warning || null);
+        }
+      } catch (e) {
+        console.error("Failed to fetch fast rankings", e);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     }
+
+    // Call fast rankings immediately
+    fetchFastRankings();
+
+    // 2. Debounce the slow AI call by 800ms
+    setAiLoading(true);
+    const debounceTimer = setTimeout(async () => {
+      try {
+        const res = await getRecommendations(selectedProcurementId!, weights, qualitativeAdjustments, false);
+        if (isMounted) {
+          setRankedRecommendations(res.recommendations);
+          setComparisonSummary(res.comparison_summary);
+          setRecommendationData(res);
+          setApiWarning(res.warning || null);
+        }
+      } catch (e) {
+        console.error("Failed to fetch AI rankings", e);
+      } finally {
+        if (isMounted) setAiLoading(false);
+      }
+    }, 800);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(debounceTimer);
+    };
   }, [selectedProcurementId, weights, qualitativeAdjustments]);
 
   async function loadBaseData() {
@@ -50,12 +112,12 @@ export default function VendorComparison() {
     try {
       setLoading(true);
       const vs = await getVendors(selectedProcurementId);
+      const quotes = await getQuotesForProcurement(selectedProcurementId);
 
       const map: Record<string, VendorQuote[]> = {};
-      await Promise.all(vs.map(async v => {
-        const q = await getVendorQuotes(v.id);
-        map[v.id] = q;
-      }));
+      vs.forEach(v => {
+        map[v.id] = quotes.filter(q => q.vendor_id === v.id);
+      });
 
       // Deduplicate vendors by name, preferring the one with quotes
       const uniqueVendorsMap: Record<string, Vendor> = {};
@@ -88,19 +150,6 @@ export default function VendorComparison() {
       console.error("Failed to load base comparison data", e);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function fetchSimulatedRankings() {
-    if (!selectedProcurementId) return;
-    try {
-      const res = await getRecommendations(selectedProcurementId, weights, qualitativeAdjustments);
-      setRankedRecommendations(res.recommendations);
-      setComparisonSummary(res.comparison_summary);
-      setRecommendationData(res);
-      setApiWarning(res.warning || null);
-    } catch (e) {
-      console.error("Failed to fetch simulated rankings", e);
     }
   }
 
@@ -1053,6 +1102,24 @@ export default function VendorComparison() {
                     <path d="M12 8h.01" />
                   </svg>
                   Decision Explainability Summary
+                  {aiLoading && (
+                    <span style={{
+                      fontSize: 11,
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      color: '#60A5FA',
+                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 600,
+                      marginLeft: 10
+                    }}>
+                      <span className="ai-loading-dot" />
+                      AI Analyzing...
+                    </span>
+                  )}
                 </h3>
                 <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
                   Transparent agentic audit trail mapping intents, trade-offs, and risk profiles.

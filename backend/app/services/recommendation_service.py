@@ -215,27 +215,39 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
     procurement_id = str(request.procurement_id)
     weights = request.weights
     qual_adjustments = request.qualitative_adjustments or {}
+    skip_ai = getattr(request, "skip_ai", False) or False
 
     client = supabase_service or supabase
 
-    # Fetch procurement context info
+    # Fetch procurement context info and vendors in parallel
+    import asyncio
     proc_title = "Procurement"
     proc_desc = ""
+    vendors = []
     try:
-        proc_resp = client.table("procurements").select("title, description").eq("id", procurement_id).execute()
+        proc_task = asyncio.to_thread(lambda: client.table("procurements").select("title, description").eq("id", procurement_id).execute())
+        vendors_task = asyncio.to_thread(lambda: client.table("vendors").select("*").eq("procurement_id", procurement_id).execute())
+        
+        proc_resp, vendors_resp = await asyncio.gather(proc_task, vendors_task)
         if proc_resp.data:
             proc_title = proc_resp.data[0].get("title", "Procurement")
             proc_desc = proc_resp.data[0].get("description", "")
-    except Exception as pe:
-        logger.warning(f"Failed to fetch procurement details: {pe}")
-
-    # 1. Fetch vendors linked to procurement
-    try:
-        vendors_resp = client.table("vendors").select("*").eq("procurement_id", procurement_id).execute()
         vendors = vendors_resp.data or []
-    except Exception as e:
-        logger.error(f"Error fetching vendors from Supabase: {e}")
-        vendors = []
+    except Exception as pe:
+        logger.warning(f"Failed to fetch procurement details or vendors in parallel: {pe}")
+        # Single-threaded fallback for robustness
+        try:
+            proc_resp = client.table("procurements").select("title, description").eq("id", procurement_id).execute()
+            if proc_resp.data:
+                proc_title = proc_resp.data[0].get("title", "Procurement")
+                proc_desc = proc_resp.data[0].get("description", "")
+        except Exception:
+            pass
+        try:
+            vendors_resp = client.table("vendors").select("*").eq("procurement_id", procurement_id).execute()
+            vendors = vendors_resp.data or []
+        except Exception:
+            vendors = []
 
     # Fallback to all vendors if none found under specific procurement_id (robust fallback)
     if not vendors:
@@ -288,25 +300,52 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
             comparison_summary="No active quotes found for the compared vendors. Please upload quotes to run the simulator."
         )
 
-    # 4. Fetch risk profiles & run optimization analysis
-    vendor_risk_map: Dict[str, int] = {}
-    for v in active_vendors:
-        v_id = v["id"]
+    # 4. Fetch risk profiles & run optimization analysis concurrently
+    import asyncio
+
+    async def fetch_risk(v_id):
         try:
             risk_data = await get_latest_vendor_risk(v_id, client=client)
-            vendor_risk_map[v_id] = risk_data.get("final_risk_score", 50)
+            return v_id, risk_data.get("final_risk_score", 50)
         except Exception as e:
             logger.warning(f"Failed to fetch risk score for vendor {v_id}, defaulting to 50: {e}")
-            vendor_risk_map[v_id] = 50
+            return v_id, 50
 
     try:
         from .renewal_service import get_renewal_analysis
         from .crossdeal_service import get_crossdeal_analysis
-        renewal_analyses, _ = await get_renewal_analysis()
-        crossdeal_opportunities, _ = await get_crossdeal_analysis()
+        renewal_task = get_renewal_analysis(skip_ai=skip_ai)
+        crossdeal_task = get_crossdeal_analysis(skip_ai=skip_ai)
     except Exception as e:
-        logger.warning(f"Failed to fetch optimization data for recommendation pipeline: {e}")
-        renewal_analyses, crossdeal_opportunities = [], []
+        logger.warning(f"Failed to setup optimization tasks: {e}")
+        renewal_task = None
+        crossdeal_task = None
+
+    risk_tasks = [fetch_risk(v["id"]) for v in active_vendors]
+    tasks = list(risk_tasks)
+    if renewal_task:
+        tasks.append(renewal_task)
+    if crossdeal_task:
+        tasks.append(crossdeal_task)
+
+    results = await asyncio.gather(*tasks)
+
+    vendor_risk_map: Dict[str, int] = {}
+    for i in range(len(active_vendors)):
+        v_id, score = results[i]
+        vendor_risk_map[v_id] = score
+
+    renewal_analyses = []
+    crossdeal_opportunities = []
+
+    idx = len(active_vendors)
+    if renewal_task:
+        renewal_res = results[idx]
+        renewal_analyses = renewal_res[0] if renewal_res else []
+        idx += 1
+    if crossdeal_task:
+        crossdeal_res = results[idx]
+        crossdeal_opportunities = crossdeal_res[0] if crossdeal_res else []
 
     def is_vendor_match(name1: str, name2: str) -> bool:
         n1 = str(name1 or "").lower().strip()
@@ -660,7 +699,7 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
     today_str = datetime.now().date().isoformat()
 
     agent_data = None
-    if GROQ_API_KEYS:
+    if GROQ_API_KEYS and not skip_ai:
         try:
             import time
             max_attempts = 3

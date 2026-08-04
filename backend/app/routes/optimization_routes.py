@@ -25,9 +25,9 @@ router = APIRouter(
 # ============================================================================
 
 @router.get("/renewal-analysis", response_model=RenewalAnalysisResponse)
-async def renewal_analysis():
+async def renewal_analysis(skip_ai: bool = False):
     try:
-        analyses, summary_dict = await get_renewal_analysis()
+        analyses, summary_dict = await get_renewal_analysis(skip_ai=skip_ai)
         return RenewalAnalysisResponse(
             total_contracts=summary_dict.get("total_contracts", 0),
             high_risk_count=summary_dict.get("high_risk_count", 0),
@@ -49,9 +49,9 @@ async def renewal_analysis():
 
 
 @router.get("/crossdeal-analysis", response_model=CrossDealAnalysisResponse)
-async def crossdeal_analysis():
+async def crossdeal_analysis(skip_ai: bool = False):
     try:
-        opportunities, summary_dict = await get_crossdeal_analysis()
+        opportunities, summary_dict = await get_crossdeal_analysis(skip_ai=skip_ai)
         return CrossDealAnalysisResponse(
             total_vendors_analyzed=summary_dict.get("total_vendors_analyzed", 0),
             vendors_with_opportunities=summary_dict.get("vendors_with_opportunities", 0),
@@ -97,12 +97,12 @@ async def strategic_analysis(request: StrategicAnalysisRequest):
 
 
 @router.get("/strategic-analysis", response_model=StrategicAnalysisResponse)
-async def get_strategic_analysis():
+async def get_strategic_analysis(skip_ai: bool = False):
     try:
         import asyncio
         (analyses, summary_dict), (opportunities, crossdeal_summary_dict) = await asyncio.gather(
-            get_renewal_analysis(),
-            get_crossdeal_analysis()
+            get_renewal_analysis(skip_ai=skip_ai),
+            get_crossdeal_analysis(skip_ai=skip_ai)
         )
         
         renewal_data = {
@@ -122,7 +122,8 @@ async def get_strategic_analysis():
 
         result = await analyze_strategic_opportunities(
             renewal_data,
-            crossdeal_data
+            crossdeal_data,
+            skip_ai=skip_ai
         )
         
         return StrategicAnalysisResponse(

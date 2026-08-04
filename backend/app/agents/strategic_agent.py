@@ -73,7 +73,8 @@ Return ONLY raw JSON with no markdown backticks:
 def generate_strategic_analysis(
    renewal_data: Dict[str, Any],
    crossdeal_data: Dict[str, Any],
-   procurement_history: list
+   procurement_history: list,
+   skip_ai: bool = False
 ) -> Dict[str, Any]:
    """
    Generate strategic procurement recommendations based on renewal and cross-deal analysis.
@@ -164,6 +165,9 @@ def generate_strategic_analysis(
        "confidence_score": confidence_score
    }
   
+   if skip_ai:
+       return default_response
+   
    # Check fast in-memory cache
    import hashlib, time
    cache_key = "strategic_" + hashlib.md5(json.dumps([renewal_data, crossdeal_data], default=str).encode()).hexdigest()

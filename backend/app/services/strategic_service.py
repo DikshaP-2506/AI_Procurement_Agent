@@ -25,7 +25,8 @@ async def fetch_procurement_history():
 
 async def analyze_strategic_opportunities(
     renewal_data: Dict[str, Any],
-    crossdeal_data: Dict[str, Any]
+    crossdeal_data: Dict[str, Any],
+    skip_ai: bool = False
 ) -> Dict[str, Any]:
     """
     Orchestrate strategic procurement analysis.
@@ -39,6 +40,7 @@ async def analyze_strategic_opportunities(
     Args:
         renewal_data: Output from GET /optimization/renewal-analysis
         crossdeal_data: Output from GET /optimization/crossdeal-analysis
+        skip_ai: Bypasses LLM narratives for instant rendering
 
     Returns:
         Strategic analysis with actions, savings, priority, impact,
@@ -52,7 +54,8 @@ async def analyze_strategic_opportunities(
         strategic_result = generate_strategic_analysis(
             renewal_data,
             crossdeal_data,
-            procurement_history
+            procurement_history,
+            skip_ai=skip_ai
         )
 
         result = {

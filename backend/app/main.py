@@ -66,11 +66,19 @@ app.include_router(agent_routes.router)
 import logging
 logger = logging.getLogger("uvicorn.error")
 
-async def run_shadow_market_scout_loop():
+def run_shadow_market_scout_sync():
+    import time
     import asyncio
     from .services.risk_service import analyze_vendor_risk
     from .supabase_client import supabase_service, supabase
     client = supabase_service or supabase
+    
+    # 1. Initial sleep to let the application startup completely first
+    time.sleep(15)
+    
+    # Establish a separate event loop for this background thread to execute async risk functions
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
     while True:
         try:
@@ -85,8 +93,10 @@ async def run_shadow_market_scout_loop():
                 if vendor_id:
                     try:
                         logger.info(f"Auditing risks for vendor: {vendor_name} ({vendor_id})...")
-                        # Perform risk analysis and persist
-                        risk_result = await analyze_vendor_risk(vendor_id, client=client, persist=True)
+                        # Run the async risk function in the thread's event loop
+                        risk_result = loop.run_until_complete(
+                            analyze_vendor_risk(vendor_id, client=client, persist=True)
+                        )
                         
                         # Write observation to shared memory service
                         from .services.memory_service import write_observation
@@ -97,17 +107,21 @@ async def run_shadow_market_scout_loop():
                         )
                     except Exception as ve:
                         logger.error(f"Error auditing vendor {vendor_name}: {ve}")
+                    
+                    # 2. Throttling sleep between vendors to prevent connection spikes and rate limits
+                    time.sleep(2.0)
                         
         except Exception as e:
             logger.error(f"Error in Shadow Market Scout loop: {e}")
             
         # Run every 24 hours
-        await asyncio.sleep(86400)
+        time.sleep(86400)
 
 @app.on_event("startup")
 async def startup_event():
-    import asyncio
-    asyncio.create_task(run_shadow_market_scout_loop())
+    import threading
+    thread = threading.Thread(target=run_shadow_market_scout_sync, daemon=True)
+    thread.start()
 
 
 

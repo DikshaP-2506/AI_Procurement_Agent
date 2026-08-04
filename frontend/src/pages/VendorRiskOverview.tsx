@@ -58,17 +58,16 @@ export default function VendorRiskOverview() {
     setLoading(true);
     setError(null);
     try {
-      let current: RiskAssessment;
+      let currentPromise: Promise<RiskAssessment>;
       if (forceRefresh) {
-        current = await analyzeVendorRisk(id);
+        currentPromise = analyzeVendorRisk(id);
       } else {
-        try {
-          current = await getVendorRisk(id);
-        } catch {
-          current = await analyzeVendorRisk(id);
-        }
+        currentPromise = getVendorRisk(id).catch(() => analyzeVendorRisk(id));
       }
-      const historyResponse = await getVendorRiskHistory(id);
+      const [current, historyResponse] = await Promise.all([
+        currentPromise,
+        getVendorRiskHistory(id)
+      ]);
       setAssessment(current);
       setHistory(historyResponse.history || []);
     } catch (err) {

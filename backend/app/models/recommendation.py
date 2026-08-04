@@ -17,6 +17,8 @@ class RecommendationRequest(BaseModel):
         default=None, 
         description="Manual adjustments for each vendor (vendor_id -> offset score from -20 to +20)"
     )
+    skip_ai: Optional[bool] = Field(default=False, description="Bypass the GROQ LLM call for faster/instant response")
+
 
 class ScoreComponent(BaseModel):
     raw: str | float | int

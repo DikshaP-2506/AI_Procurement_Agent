@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, BackgroundTasks
 import traceback
 from ..supabase_client import supabase, supabase_service
 from ..services.pdf_parser import extract_text_from_pdf
@@ -8,7 +8,7 @@ router = APIRouter(prefix="/quotes", tags=["quotes"])
 
 
 @router.post('/upload')
-async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...)):
+async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     last_step = None
     try:
         contents = await file.read()
@@ -238,8 +238,12 @@ async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...))
         # 7) Trigger risk analysis (non-fatal)
         try:
             from ..services.risk_service import analyze_vendor_risk
-            await analyze_vendor_risk(vendor_id, persist=True)
-            print(f"Automatically updated risk analysis for vendor {vendor_id}")
+            if background_tasks:
+                background_tasks.add_task(analyze_vendor_risk, vendor_id, persist=True)
+                print(f"Backgrounded risk analysis for vendor {vendor_id}")
+            else:
+                await analyze_vendor_risk(vendor_id, persist=True)
+                print(f"Automatically updated risk analysis for vendor {vendor_id}")
         except Exception as risk_err:
             print(f"Warning: Failed to auto-update vendor risk analysis: {risk_err}")
 
@@ -291,10 +295,20 @@ async def upload_quote(vendor_id: str = Form(...), file: UploadFile = File(...))
 
 
 @router.get("/")
-def get_quotes(vendor_id: str):
+def get_quotes(vendor_id: str = None, procurement_id: str = None):
     client = supabase_service if supabase_service else supabase
-    result = client.table("vendor_quotes")\
-        .select("*")\
-        .eq("vendor_id", vendor_id)\
-        .execute()
-    return result.data
+    if procurement_id:
+        # Fetch vendors for this procurement first
+        vendors_resp = client.table("vendors").select("id").eq("procurement_id", procurement_id).execute()
+        vendor_ids = [v["id"] for v in (vendors_resp.data or [])]
+        if not vendor_ids:
+            return []
+        result = client.table("vendor_quotes").select("*").in_("vendor_id", vendor_ids).execute()
+        return result.data
+    elif vendor_id:
+        result = client.table("vendor_quotes")\
+            .select("*")\
+            .eq("vendor_id", vendor_id)\
+            .execute()
+        return result.data
+    return []

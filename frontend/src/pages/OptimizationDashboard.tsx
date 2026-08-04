@@ -8,6 +8,7 @@ export default function OptimizationDashboard() {
   const [strategic, setStrategic] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,22 +17,75 @@ export default function OptimizationDashboard() {
         setLoading(true);
         setError(null);
         
-        const [renewalsRes, crossdealRes, strategicRes, logsRes] = await Promise.all([
-          api.get("/optimization/renewal-analysis"),
-          api.get("/optimization/crossdeal-analysis"),
-          api.get("/optimization/strategic-analysis"),
+        // 1. Fetch math-only data instantly
+        const [renewalsResFast, crossdealResFast, strategicResFast, logsRes] = await Promise.all([
+          api.get("/optimization/renewal-analysis?skip_ai=true"),
+          api.get("/optimization/crossdeal-analysis?skip_ai=true"),
+          api.get("/optimization/strategic-analysis?skip_ai=true"),
           api.get("/audit/logs")
         ]);
         
-        setRenewals(renewalsRes.data.contracts || []);
-        setOpportunities(crossdealRes.data.opportunities || []);
-        setStrategic(strategicRes.data.strategic_analysis || null);
+        setRenewals(renewalsResFast.data.contracts || []);
+        setOpportunities(crossdealResFast.data.opportunities || []);
+        setStrategic(strategicResFast.data.strategic_analysis || null);
         setLogs(logsRes.data.logs || []);
+        setLoading(false); // UI is now fully rendered and populated!
+
+        // 2. Fetch full AI narratives in the background
+        setAiLoading(true);
+        const [renewalsResAi, crossdealResAi, strategicResAi] = await Promise.all([
+          api.get("/optimization/renewal-analysis?skip_ai=false"),
+          api.get("/optimization/crossdeal-analysis?skip_ai=false"),
+          api.get("/optimization/strategic-analysis?skip_ai=false")
+        ]);
+
+        setRenewals(prev => {
+          const aiMap = new Map(renewalsResAi.data.contracts.map((c: any) => [c.contract_id, c]));
+          return prev.map(c => {
+            const aiC = aiMap.get(c.contract_id) as any;
+            if (aiC) {
+              return {
+                ...c,
+                recommendation: aiC.recommendation,
+                explainability: aiC.explainability
+              };
+            }
+            return c;
+          });
+        });
+
+        setOpportunities(prev => {
+          const aiMap = new Map(crossdealResAi.data.opportunities.map((o: any) => [o.vendor_name, o]));
+          return prev.map(o => {
+            const aiO = aiMap.get(o.vendor_name) as any;
+            if (aiO) {
+              return {
+                ...o,
+                recommendation: aiO.recommendation
+              };
+            }
+            return o;
+          });
+        });
+
+        setStrategic((prev: any) => {
+          const aiS = strategicResAi.data.strategic_analysis;
+          if (aiS && prev) {
+            return {
+              ...prev,
+              strategic_actions: aiS.strategic_actions,
+              business_impact: aiS.business_impact
+            };
+          }
+          return aiS || prev;
+        });
+
       } catch (err: any) {
         console.error("Error loading optimization data:", err);
         setError("Failed to fetch live optimization data from the backend. Make sure the backend server is running.");
       } finally {
         setLoading(false);
+        setAiLoading(false);
       }
     }
     
@@ -94,24 +148,43 @@ export default function OptimizationDashboard() {
               Cross-deal negotiation, contract renewal intelligence, and vendor strategic consolidation.
             </p>
           </div>
-          <button 
-            onClick={() => window.location.reload()}
-            style={{
-              background: "rgba(59, 130, 246, 0.12)",
-              color: "#60A5FA",
-              border: "1px solid rgba(59, 130, 246, 0.2)",
-              padding: "10px 18px",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all 0.2s"
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = "rgba(59, 130, 246, 0.2)"; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = "rgba(59, 130, 246, 0.12)"; }}
-          >
-            Refresh Intel
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {aiLoading && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "rgba(96, 165, 250, 0.08)",
+                border: "1px solid rgba(96, 165, 250, 0.2)",
+                padding: "8px 14px",
+                borderRadius: 8,
+                fontSize: 12,
+                color: "#60A5FA",
+                fontWeight: 600
+              }}>
+                <span className="ai-loading-dot"></span>
+                AI Analyzing Portfolio...
+              </div>
+            )}
+            <button 
+              onClick={() => window.location.reload()}
+              style={{
+                background: "rgba(59, 130, 246, 0.12)",
+                color: "#60A5FA",
+                border: "1px solid rgba(59, 130, 246, 0.2)",
+                padding: "10px 18px",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = "rgba(59, 130, 246, 0.2)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = "rgba(59, 130, 246, 0.12)"; }}
+            >
+              Refresh Intel
+            </button>
+          </div>
         </div>
 
         {error && (

@@ -48,6 +48,17 @@ export async function getVendorQuotes(vendorId: string): Promise<VendorQuote[]> 
   }
 }
 
+export async function getQuotesForProcurement(procurementId: string): Promise<VendorQuote[]> {
+  try {
+    const res = await api.get('/quotes/', { params: { procurement_id: procurementId } });
+    return res.data as VendorQuote[];
+  } catch (err) {
+    console.error('getQuotesForProcurement error', err);
+    throw err;
+  }
+}
+
 export default api;
 
 export { API_BASE };
+

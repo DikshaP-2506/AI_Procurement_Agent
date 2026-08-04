@@ -101,17 +101,29 @@ def generate_renewal_recommendation(
 
 
 
+_CONTRACTS_CACHE = {"timestamp": 0.0, "data": []}
+_VENDORS_CACHE = {"timestamp": 0.0, "data": []}
+
 async def fetch_contracts_from_supabase() -> List[dict]:
     """
     Fetch all contracts from Supabase with error resilience and 4.0s timeout.
     """
+    import time
+    now = time.time()
+
+    if now - _CONTRACTS_CACHE["timestamp"] < 30.0:
+        return _CONTRACTS_CACHE["data"]
+        
     try:
         client = supabase_service or supabase
         response = await asyncio.wait_for(
             asyncio.to_thread(lambda: client.table("contracts").select("*").execute()),
             timeout=4.0
         )
-        return response.data if response.data else []
+        data = response.data if response.data else []
+        _CONTRACTS_CACHE["timestamp"] = now
+        _CONTRACTS_CACHE["data"] = data
+        return data
     except Exception as e:
         logger.warning(f"Unable to fetch contracts from Supabase (network timeout/fallback): {e}")
         return []
@@ -130,7 +142,7 @@ async def fetch_vendor_name(vendor_id: str) -> str:
         return "Unknown Vendor"
 
 
-async def analyze_contract_renewal(contract: dict) -> RenewalRiskAnalysis:
+async def analyze_contract_renewal(contract: dict, vendor_map: dict = None) -> RenewalRiskAnalysis:
     """
     Analyze a single contract for renewal risk using notice deadline math.
     """
@@ -141,7 +153,7 @@ async def analyze_contract_renewal(contract: dict) -> RenewalRiskAnalysis:
         renewal_date = renewal_date_str if isinstance(renewal_date_str, date) else renewal_date_str.date()
     else:
         renewal_date = date.today() + timedelta(days=60)
-
+ 
     auto_renewal = bool(contract.get("auto_renewal", False))
     notice_period_days = int(contract.get("notice_period_days", 30) or 30)
     days_remaining = calculate_days_remaining(renewal_date)
@@ -152,7 +164,11 @@ async def analyze_contract_renewal(contract: dict) -> RenewalRiskAnalysis:
         notice_period_days
     )
     
-    vendor_name = contract.get("vendor_name") or await fetch_vendor_name(contract.get("vendor_id", ""))
+    v_id = contract.get("vendor_id", "")
+    vendor_name = contract.get("vendor_name")
+    if not vendor_name:
+        vendor_name = (vendor_map or {}).get(v_id) or await fetch_vendor_name(v_id)
+        
     contract_name = contract.get("contract_name", "Vendor Contract")
     
     recommendation = generate_renewal_recommendation(
@@ -189,7 +205,7 @@ async def analyze_contract_renewal(contract: dict) -> RenewalRiskAnalysis:
     )
 
 
-async def get_renewal_analysis() -> Tuple[List[RenewalRiskAnalysis], dict]:
+async def get_renewal_analysis(skip_ai: bool = False) -> Tuple[List[RenewalRiskAnalysis], dict]:
     """
     Analyze all contracts for renewal risk.
     """
@@ -207,15 +223,39 @@ async def get_renewal_analysis() -> Tuple[List[RenewalRiskAnalysis], dict]:
 
     analyses: List[RenewalRiskAnalysis] = []
 
+    # Pre-fetch all vendors to prevent N+1 sequential DB lookups in the loop
+    vendor_map = {}
+    try:
+        import time
+        now = time.time()
+
+        if now - _VENDORS_CACHE["timestamp"] < 30.0:
+            vendors_data = _VENDORS_CACHE["data"]
+        else:
+            client = supabase_service or supabase
+            vendors_response = await asyncio.to_thread(lambda: client.table("vendors").select("id, vendor_name").execute())
+            vendors_data = vendors_response.data or []
+            _VENDORS_CACHE["timestamp"] = now
+            _VENDORS_CACHE["data"] = vendors_data
+            
+        if vendors_data:
+            vendor_map = {v["id"]: v["vendor_name"] for v in vendors_data if v.get("id")}
+    except Exception as ve_err:
+        logger.warning(f"Unable to pre-fetch vendors for renewal mapping: {ve_err}")
+
     for contract in contracts:
         try:
             renewal_date = contract.get("renewal_date")
-
+ 
             if not renewal_date:
+                v_id = contract.get("vendor_id", "")
+                vendor_name = contract.get("vendor_name")
+                if not vendor_name:
+                    vendor_name = vendor_map.get(v_id) or await fetch_vendor_name(v_id)
                 analysis = RenewalRiskAnalysis(
                     contract_id=str(contract.get("id", "")),
                     contract_name=contract.get("contract_name", "Unspecified Contract"),
-                    vendor_name=contract.get("vendor_name") or await fetch_vendor_name(contract.get("vendor_id", "")),
+                    vendor_name=vendor_name or "Unknown Vendor",
                     renewal_date=None,
                     days_remaining=None,
                     risk_level="UNKNOWN",
@@ -224,8 +264,8 @@ async def get_renewal_analysis() -> Tuple[List[RenewalRiskAnalysis], dict]:
                 )
                 analyses.append(analysis)
                 continue
-
-            analysis = await analyze_contract_renewal(contract)
+ 
+            analysis = await analyze_contract_renewal(contract, vendor_map)
             analyses.append(analysis)
 
         except Exception as e:
@@ -259,11 +299,12 @@ async def get_renewal_analysis() -> Tuple[List[RenewalRiskAnalysis], dict]:
     }
 
     # Enrich recommendations and explainability using grounded LLM presentation layer
-    try:
-        from .llm_narrative_service import enrich_renewal_analyses_with_llm
-        analyses = await enrich_renewal_analyses_with_llm(analyses)
-    except Exception as e:
-        logger.warning(f"Unable to run LLM narrative enrichment on renewal contracts: {e}")
+    if not skip_ai:
+        try:
+            from .llm_narrative_service import enrich_renewal_analyses_with_llm
+            analyses = await enrich_renewal_analyses_with_llm(analyses)
+        except Exception as e:
+            logger.warning(f"Unable to run LLM narrative enrichment on renewal contracts: {e}")
 
     # Audit summary message
     urgent_contracts = [a for a in analyses if a.risk_level in ["CRITICAL", "HIGH"]]

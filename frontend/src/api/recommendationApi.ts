@@ -66,12 +66,14 @@ export interface ApplyRecommendationResponse {
 export async function getRecommendations(
   procurementId: string,
   weights: Weights,
-  qualitativeAdjustments?: Record<string, number>
+  qualitativeAdjustments?: Record<string, number>,
+  skipAi?: boolean
 ): Promise<RecommendationResponse> {
   const response = await api.post('/recommendation/', {
     procurement_id: procurementId,
     weights,
     qualitative_adjustments: qualitativeAdjustments || null,
+    skip_ai: skipAi ?? false,
   });
   return response.data as RecommendationResponse;
 }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useProcurement } from '../context/ProcurementContext';
 import { createProcurement } from '../api/procurementApi';
 
 export default function Navbar() {
+  const navigate = useNavigate();
   const { selectedProcurementId, setSelectedProcurementId, procurements, refreshProcurements } = useProcurement();
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -65,6 +66,7 @@ export default function Navbar() {
       // Refresh context list and automatically select the new project
       await refreshProcurements();
       setSelectedProcurementId(newProject.id);
+      navigate('/');
       
       // Reset form and close modal
       setTitle('');
@@ -246,6 +248,7 @@ export default function Navbar() {
                               setSelectedProcurementId(p.id);
                               setIsDropdownOpen(false);
                               setSearchQuery('');
+                              navigate('/');
                             }}
                             style={{
                               padding: '8px 10px',

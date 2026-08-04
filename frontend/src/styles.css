@@ -256,3 +256,23 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* AI Analysis Loading Dot & Pulse */
+@keyframes ai-pulse {
+  0%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.ai-loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  animation: ai-pulse 1.2s infinite ease-in-out;
+}
