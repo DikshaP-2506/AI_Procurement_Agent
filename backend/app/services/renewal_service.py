@@ -321,7 +321,7 @@ async def get_renewal_analysis(skip_ai: bool = False) -> Tuple[List[RenewalRiskA
         )
 
     await log_agent_execution(
-        agent_name="Subscription Renewal Catcher",
+        agent_name="Renewal Intelligence",
         action_type="renewal_analysis",
         input_payload={
             "source": "contracts table",

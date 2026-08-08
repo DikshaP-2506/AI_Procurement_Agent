@@ -47,6 +47,8 @@ async def get_audit_logs():
         agent_counts = {}
         
         for log in all_logs:
+            if log.get("agent_name") == "Subscription Renewal Catcher":
+                log["agent_name"] = "Renewal Intelligence"
             reasoning = str(log.get("reasoning") or "")
             agent = str(log.get("agent_name") or "")
             

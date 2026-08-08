@@ -559,7 +559,7 @@ async def get_recommendation_analysis(request: RecommendationRequest) -> Recomme
         if matching_crossdeal:
             single_expl += f" [CROSS DEAL] Influenced by Cross-Deal Negotiator: bundling potential across {len(matching_crossdeal.departments)} departments unlocks {matching_crossdeal.estimated_savings_percent}% estimated savings (added +5.0 strategic consolidation bonus)."
         if highest_renewal_risk in ["CRITICAL", "HIGH", "MEDIUM"]:
-            single_expl += f" [RENEWAL RISK] Flagged by Renewal Catcher: active contract has {highest_renewal_risk} renewal risk (applied {risk_penalty:.0f}-point risk safety penalty)."
+            single_expl += f" [RENEWAL RISK] Flagged by Renewal Intelligence: active contract has {highest_renewal_risk} renewal risk (applied {risk_penalty:.0f}-point risk safety penalty)."
         if qual_adj != 0:
             single_expl += f" Includes a qualitative adjustment of {qual_adj:+.1f}."
 

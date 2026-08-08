@@ -113,6 +113,12 @@ export default function OptimizationDashboard() {
   const confidenceScore = strategic?.confidence_score || 85;
   const totalSavingsText = strategic?.estimated_savings || "$240,000";
   const vendorReductionPercent = strategic?.reduction_percent || 0;
+
+  const filteredLogs = logs.filter(
+    (log: any) =>
+      !log.agent_name?.toLowerCase().includes("strategic") &&
+      !log.agent_name?.toLowerCase().includes("consolidation")
+  );
   
   const getRiskColor = (level: string) => {
     switch (level?.toUpperCase()) {
@@ -145,7 +151,7 @@ export default function OptimizationDashboard() {
               Procurement Optimization
             </h1>
             <p style={{ margin: 0, color: "#94A3B8", maxWidth: 760 }}>
-              Cross-deal negotiation, contract renewal intelligence, and vendor strategic consolidation.
+              Cross-deal negotiation and contract renewal intelligence.
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -457,58 +463,7 @@ export default function OptimizationDashboard() {
 
             </div>
 
-            {/* 5. STRATEGIC CONSOLIDATION ENGINE */}
-            <div className="card-glass">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                <div>
-                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Strategic Consolidation Engine</h3>
-                  <p style={{ margin: "4px 0 0 0", fontSize: 12, color: "#94A3B8" }}>
-                    Vendor portfolio reduction metrics & commercial savings projections.
-                  </p>
-                </div>
-                <div style={{
-                  background: "rgba(16, 185, 129, 0.12)",
-                  border: "1px solid rgba(16, 185, 129, 0.2)",
-                  color: "#34D399",
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontWeight: 600
-                }}>
-                  Priority: {strategic?.priority || "HIGH"}
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20, marginBottom: 24 }}>
-                <div style={{ background: "rgba(0,0,0,0.2)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.03)" }}>
-                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700 }}>Current Vendors</span>
-                  <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6 }}>{strategic?.current_vendors || 4}</div>
-                </div>
-                <div style={{ background: "rgba(0,0,0,0.2)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.03)" }}>
-                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700 }}>Recommended Vendors</span>
-                  <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6, color: "#60A5FA" }}>{strategic?.recommended_vendors || 2}</div>
-                </div>
-                <div style={{ background: "rgba(0,0,0,0.2)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.03)" }}>
-                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700 }}>Target Vendor Reduction</span>
-                  <div style={{ fontSize: 28, fontWeight: 800, marginTop: 6, color: "#A855F7" }}>{vendorReductionPercent}%</div>
-                </div>
-                <div style={{ background: "rgba(0,0,0,0.2)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.03)" }}>
-                  <span style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700 }}>Estimated Annual Savings</span>
-                  <div style={{ 
-                    fontSize: String(totalSavingsText).length > 15 ? 18 : String(totalSavingsText).length > 10 ? 22 : 28, 
-                    fontWeight: 800, 
-                    marginTop: 6, 
-                    color: "#10B981",
-                    lineHeight: 1.2,
-                    wordBreak: "break-word"
-                  }}>{totalSavingsText}</div>
-                </div>
-              </div>
-            </div>
-
-
-
-            {/* 6. AGENT CONTRIBUTION PANEL */}
+            {/* 5. AGENT CONTRIBUTION PANEL */}
             <div className="card-glass">
               <div>
                 <h3 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Agent Contribution Panel</h3>
@@ -530,12 +485,6 @@ export default function OptimizationDashboard() {
                     desc: "Calculates contract notice periods, warning flags, and outputs explainability details for expiring agreements.",
                     status: "ACTIVE",
                     color: "#EF4444"
-                  },
-                  {
-                    name: "Strategic Agent",
-                    desc: "Consolidates findings, executes LLM synthesis routines, and writes strategic vendor reduction workflows.",
-                    status: "ACTIVE",
-                    color: "#A855F7"
                   },
                   {
                     name: "Audit Layer",
@@ -572,7 +521,7 @@ export default function OptimizationDashboard() {
               </div>
             </div>
 
-            {/* 7. OPTIMIZATION ACTIVITY TIMELINE - How was this generated? */}
+            {/* 6. OPTIMIZATION ACTIVITY TIMELINE - How was this generated? */}
             <div className="card-glass">
               <div>
                 <h3 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Optimization Activity Timeline</h3>
@@ -581,15 +530,14 @@ export default function OptimizationDashboard() {
                 </p>
               </div>
 
-
-              {logs.length === 0 ? (
+              {filteredLogs.length === 0 ? (
                 <div style={{ padding: 48, textAlign: "center", color: "#94A3B8", fontStyle: "italic" }}>
                   No logged agent activity found in the system.
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 0, borderLeft: "2px solid rgba(255,255,255,0.06)", marginLeft: 8, paddingLeft: 20 }}>
-                  {logs.slice(0, 15).map((log: any, idx: number) => {
-                    const dotColor = log.agent_name?.includes("Renewal") ? "#EF4444" : log.agent_name?.includes("Cross") ? "#3B82F6" : log.agent_name?.includes("Strategic") ? "#A855F7" : "#10B981";
+                  {filteredLogs.slice(0, 15).map((log: any, idx: number) => {
+                    const dotColor = log.agent_name?.includes("Renewal") ? "#EF4444" : log.agent_name?.includes("Cross") ? "#3B82F6" : "#10B981";
                     
                     return (
                       <div key={idx} style={{ position: "relative", paddingBottom: 24 }}>
@@ -607,7 +555,7 @@ export default function OptimizationDashboard() {
                         
                         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                           <span style={{ fontSize: 13.5, fontWeight: 700, color: "#FFF" }}>
-                            {log.agent_name}
+                            {log.agent_name === "Subscription Renewal Catcher" ? "Renewal Intelligence" : log.agent_name}
                           </span>
                           <span style={{ fontSize: 11.5, color: "#94A3B8" }}>
                             {formatTime(log.created_at)}
