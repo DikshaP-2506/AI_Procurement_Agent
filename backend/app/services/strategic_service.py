@@ -82,20 +82,26 @@ async def analyze_strategic_opportunities(
             }
         }
 
-        # Build dynamic, context-specific audit reasoning
+        # Log exact work done at this time step
         actions_sample = strategic_result.get("strategic_actions", [])
-        top_action = actions_sample[0] if actions_sample else "Formulated SLA consolidation pathways."
         priority = strategic_result.get("priority", "HIGH")
         
-        dynamic_reasoning = (
-            f"Synthesized cross-deal volume opportunities and contract renewal risk alerts. "
-            f"Formulated strategic vendor reduction plan and prioritized: {top_action}"
-        )
+        if skip_ai:
+            action_type = "strategic_analysis"
+            dynamic_reasoning = (
+                f"Synthesized renewal contract risks ({renewal_data.get('total_contracts', 0)} contracts) with cross-deal consolidation opportunities "
+                f"to establish portfolio savings targets ({strategic_result.get('estimated_savings')})."
+            )
+        else:
+            action_type = "strategic_ai_synthesis"
+            dynamic_reasoning = (
+                f"Generated executive business impact brief and vendor reduction action pathway ({len(actions_sample)} actions) via LLaMA-3.1."
+            )
 
         # Log agent execution
         await log_agent_execution(
             agent_name="Strategic Procurement Agent",
-            action_type="strategic_analysis",
+            action_type=action_type,
             input_payload={
                 "renewal_summary": {
                     "total_contracts": renewal_data.get(

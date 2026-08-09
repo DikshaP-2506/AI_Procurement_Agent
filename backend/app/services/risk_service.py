@@ -352,15 +352,15 @@ async def analyze_vendor_risk(
     v_name = context["vendor"].get("vendor_name") or vendor_id
     risk_lvl = aggregated.get("overall_risk_level", "LOW")
 
-    if risk_lvl in ["HIGH", "CRITICAL"]:
+    if risk_lvl.upper() in ["HIGH", "CRITICAL"]:
         audit_reasoning = (
-            f"Audited market signals and historical delivery performance for '{v_name}'. "
-            f"Identified elevated operational risk ({risk_lvl}) and flagged vendor for active performance monitoring."
+            f"Audited live market disruption signals, SLA compliance, and delay probability for '{v_name}' "
+            f"(Identified elevated risk: {risk_lvl.upper()}; flagged for active performance monitoring)."
         )
     else:
         audit_reasoning = (
-            f"Audited market signals and historical delivery performance for '{v_name}'. "
-            f"Verified stable financial health and confirmed {risk_lvl} supply chain risk."
+            f"Audited live market disruption signals, SLA compliance, and delay probability for '{v_name}' "
+            f"(Confirmed stable supplier health: {risk_lvl.upper()} risk)."
         )
 
     await log_agent_execution(

@@ -339,30 +339,26 @@ async def get_renewal_analysis(skip_ai: bool = False) -> Tuple[List[RenewalRiskA
         except Exception as e:
             logger.warning(f"Unable to run LLM narrative enrichment on renewal contracts: {e}")
 
-    # Audit summary message
-    urgent_contracts = [a for a in analyses if a.risk_level in ["CRITICAL", "HIGH"]]
-    if urgent_contracts:
-        top_c = urgent_contracts[0]
-        vendors_affected = list(set(a.vendor_name for a in urgent_contracts if a.vendor_name))
-        vendor_str = ", ".join(vendors_affected[:3])
+    # Log exact work done at this time step
+    if skip_ai:
+        action_type = "renewal_analysis"
         audit_reasoning = (
-            f"Audited {len(contracts)} contracts across renewal windows and notice periods. "
-            f"Flagged {len(urgent_contracts)} high/critical risk agreements across {vendor_str} "
-            f"including '{top_c.contract_name}' ({top_c.risk_level} risk, {abs(top_c.days_remaining) if top_c.days_remaining is not None else 0}d overdue). "
-            f"Issued directive: {top_c.recommendation[:120]}..."
+            f"Scanned {len(contracts)} active vendor contracts in Supabase and computed renewal deadline risk levels "
+            f"({high_risk} critical/high, {medium_risk} medium, {low_risk} low)."
         )
     else:
+        action_type = "renewal_ai_enrichment"
         audit_reasoning = (
-            f"Audited {len(contracts)} active vendor contracts against notice period deadlines. "
-            f"Confirmed all agreements operate within compliant windows with 0 critical renewal risks."
+            f"Generated personalized procurement action directives and explainability narratives for {len(contracts)} contracts via LLaMA-3.1."
         )
 
     await log_agent_execution(
         agent_name="Renewal Intelligence",
-        action_type="renewal_analysis",
+        action_type=action_type,
         input_payload={
             "source": "contracts table",
-            "total_contracts_analyzed": len(contracts)
+            "total_contracts_analyzed": len(contracts),
+            "mode": "ai_enrichment" if not skip_ai else "deterministic_scan"
         },
         output_payload={
             "total_contracts": len(contracts),

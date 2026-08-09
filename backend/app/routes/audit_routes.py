@@ -52,11 +52,15 @@ async def get_audit_logs():
             reasoning = str(log.get("reasoning") or "")
             agent = str(log.get("agent_name") or "")
             
-            # Filter out old static boilerplate strings if specific ones exist
-            if "Combined historical procurement performance" in reasoning:
+            # Filter out old static boilerplate strings
+            if (
+                "Combined historical procurement performance" in reasoning
+                or "issued directive to initiate immediate renegotiation before auto-renewal deadline" in reasoning
+                or (reasoning.startswith("Scanned active contract renewal windows") and "Dell Technologies" in reasoning)
+            ):
                 continue
                 
-            # Avoid consecutive duplicate reasoning text
+            # Avoid duplicate reasoning text
             if reasoning == last_reasoning:
                 continue
             

@@ -315,27 +315,32 @@ async def get_crossdeal_analysis(skip_ai: bool = False) -> Tuple[List[DealOpport
         except Exception as e:
             logger.warning(f"Unable to run LLM narrative enrichment on cross-deal opportunities: {e}")
 
-    # Generate concise, human-readable audit-style description
-    if opportunities:
-        opp_summaries = [f"{o.vendor_name} ({', '.join(o.departments)}: ~${o.estimated_savings_amount:,.0f})" for o in opportunities[:3]]
-        opp_str = "; ".join(opp_summaries)
-        audit_reasoning = (
-            f"Analyzed {len(procurements)} procurement engagements across {len(grouped)} suppliers. "
-            f"Discovered {len(opportunities)} multi-department consolidation bundles [{opp_str}] "
-            f"totaling ${total_estimated_savings:,.0f} in enterprise volume savings."
-        )
+    # Log exact work done at this time step
+    if skip_ai:
+        action_type = "crossdeal_analysis"
+        if opportunities:
+            opp_names = [o.vendor_name for o in opportunities]
+            audit_reasoning = (
+                f"Analyzed {len(procurements)} procurement engagements across {len(grouped)} suppliers and identified {len(opportunities)} multi-department consolidation bundles "
+                f"({', '.join(opp_names)}) totaling ${total_estimated_savings:,.0f} in volume savings."
+            )
+        else:
+            audit_reasoning = (
+                f"Analyzed {len(procurements)} procurement records across all enterprise business units. Confirmed no multi-department supplier overlaps currently exist."
+            )
     else:
+        action_type = "crossdeal_ai_enrichment"
         audit_reasoning = (
-            f"Analyzed {len(procurements)} procurement records across all enterprise business units. "
-            f"Confirmed no multi-department supplier overlaps currently exist."
+            f"Formulated Master Service Agreement consolidation strategies and SLA harmonization recommendations for multi-department suppliers via LLaMA-3.1."
         )
 
     await log_agent_execution(
         agent_name="Cross Deal Negotiator",
-        action_type="crossdeal_analysis",
+        action_type=action_type,
         input_payload={
             "source": "procurements table",
-            "total_procurements_analyzed": len(procurements)
+            "total_procurements_analyzed": len(procurements),
+            "mode": "ai_enrichment" if not skip_ai else "deterministic_scan"
         },
         output_payload={
             "total_vendors_analyzed": len(grouped),
