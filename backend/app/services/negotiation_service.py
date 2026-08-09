@@ -1,115 +1,120 @@
-from typing import List, Dict, Any, Optional
+"""Negotiation service for procurement RAG/agent workflows."""
+
 import json
+import logging
+import re
 from datetime import datetime
-import math
-from ..supabase_client import supabase, supabase_service
-from ..agents.negotiation_agent import (
-    generate_negotiation_strategy,
-    generate_negotiation_email,
-)
+from typing import Any, Dict, List, Optional
+
 from ..agents import negotiation_agent as negotiation_agent_module
-from .audit_service import log_agent_execution
+from ..agents.negotiation_agent import (
+    generate_negotiation_email,
+    generate_negotiation_strategy,
+    retrieve_rag_evidence,
+)
 from ..models.negotiation import (
+    NegotiationEmail,
     NegotiationHistoryRecord,
     NegotiationStrategy,
-    NegotiationEmail,
     NegotiationStrategyResult,
 )
-
-CATEGORY_MATCH_WEIGHT = 25.0
-DEPARTMENT_MATCH_WEIGHT = 15.0
-SUCCESS_SCORE_WEIGHT = 0.35
-QUOTE_SIMILARITY_WEIGHT = 20.0
-OUTCOME_WEIGHT = 10.0
-EFFICIENCY_WEIGHT = 5.0
-VENDOR_MATCH_WEIGHT = 5.0
-DELIVERY_MATCH_WEIGHT = 8.0
-WARRANTY_MATCH_WEIGHT = 4.0
-PAYMENT_TERMS_WEIGHT = 4.0
-SUPPORT_LEVEL_WEIGHT = 3.0
-COMPLIANCE_WEIGHT = 6.0
+from ..supabase_client import supabase, supabase_service
+from .audit_service import log_agent_execution
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
+logger = logging.getLogger(__name__)
+
+
+def _text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _safe_float(value: Any) -> Optional[float]:
     try:
+        if value in (None, ""):
+            return None
         return float(value)
     except (TypeError, ValueError):
-        return default
+        return None
 
 
-def _safe_int(value: Any, default: int = 0) -> int:
+def _safe_int(value: Any) -> Optional[int]:
     try:
+        if value in (None, ""):
+            return None
         return int(value)
     except (TypeError, ValueError):
-        return default
+        return None
 
 
-def _normalize_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
+def _norm(value: Any) -> str:
+    text = _text(value).lower()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]+", " ", text)).strip()
 
 
-def _text_similarity(value_a: Any, value_b: Any) -> float:
-    left = _normalize_text(value_a).lower()
-    right = _normalize_text(value_b).lower()
-    if not left or not right:
-        return 0.0
-    if left == right:
-        return 1.0
-    if left in right or right in left:
-        return 0.75
-    return 0.0
-
-
-def _value_similarity(current_value: Any, historical_value: Any, fallback: float = 0.0) -> float:
-    current = _safe_float(current_value, 0.0)
-    historical = _safe_float(historical_value, 0.0)
-    if current <= 0 and historical <= 0:
-        return 0.0
-    base = max(abs(current), abs(historical), 1.0)
-    diff = abs(current - historical)
-    return max(0.0, 1.0 - min(diff / base, 1.0))
-
-
-def _normalize_optional_bool(value: Any) -> bool:
-    if isinstance(value, bool):
+def _parse_json(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
         return value
-    if value is None:
-        return False
-    if isinstance(value, (int, float)):
-        return bool(value)
-    return str(value).strip().lower() in {"true", "1", "yes", "y"}
+    if not value:
+        return {}
+    try:
+        return json.loads(value) if isinstance(value, str) else {}
+    except Exception:
+        return {}
 
 
-def _format_negotiation_context(record: NegotiationHistoryRecord) -> str:
-    """Format a concise procurement summary for LLM consumption."""
-    discount_received = f"{record.discount_received}%" if record.discount_received is not None else "N/A"
-    outcome = record.outcome or "Unknown"
-    success_score = record.success_score if record.success_score is not None else "N/A"
-    strategy_used = record.strategy_used or "N/A"
-    quote_value = record.initial_quote_value if record.initial_quote_value is not None else "N/A"
+def _quote_value(quote: Dict[str, Any]) -> Optional[float]:
+    """Return a comparable unit/quoted value, correcting obvious total-price fields."""
+    direct = _safe_float(quote.get("price"))
+    extracted = _parse_json(quote.get("extracted_json"))
+    full_ai = extracted.get("full_ai_result") or {}
+    extracted_data = full_ai.get("extracted_data") or {}
+    extracted_price = _safe_float(extracted_data.get("price"))
 
-    return (
-        f"Vendor: {record.vendor_name or 'Unknown'}\n"
-        f"Category: {record.product_category or 'Unknown'}\n"
-        f"Quote Value: {quote_value}\n"
-        f"Strategy: {strategy_used}\n"
-        f"Discount Received: {discount_received}\n"
-        f"Outcome: {outcome}\n"
-        f"Success Score: {success_score}"
+    if direct is None:
+        return extracted_price
+    if extracted_price is None or extracted_price <= 0:
+        return direct
+
+    # Some uploaded quotes store the grand total in price while extracted_data.price
+    # is the comparable unit price. Prefer the unit price when the discrepancy is large.
+    ratio = max(direct, extracted_price) / max(min(direct, extracted_price), 1.0)
+    if ratio >= 20:
+        return extracted_price
+    return direct
+
+
+def _quote_summary(quote: Dict[str, Any], vendor: Dict[str, Any]) -> Dict[str, Any]:
+    value = _quote_value(quote)
+    return {
+        "quote_id": quote.get("id"),
+        "vendor_id": quote.get("vendor_id") or vendor.get("id"),
+        "vendor_name": _text(vendor.get("vendor_name")),
+        "quote_value": value,
+        "delivery_days": _safe_int(quote.get("delivery_days")),
+        "warranty_years": _safe_float(quote.get("warranty_years")),
+        "support_level": quote.get("support_level"),
+        "payment_terms": quote.get("payment_terms"),
+        "compliance_score": _safe_float(quote.get("compliance_score")),
+        "created_at": quote.get("created_at"),
+    }
+
+
+async def _fetch_vendors(active_client: Any, procurement_id: Optional[str]) -> List[Dict[str, Any]]:
+    if not procurement_id:
+        return []
+    response = (
+        active_client.table("vendors").select("*").eq("procurement_id", procurement_id).execute()
     )
+    return getattr(response, "data", None) or []
 
 
-def _build_strategy_candidates(records: List[NegotiationHistoryRecord]) -> List[str]:
-    """Extract concise negotiation patterns for audit logging."""
-    candidates: List[str] = []
-    for record in records[:3]:
-        strategy = record.strategy_used or "Unknown"
-        outcome = record.outcome or "Unknown"
-        success_score = record.success_score if record.success_score is not None else "N/A"
-        candidates.append(f"{record.vendor_name or 'Unknown'} | {strategy} | {outcome} | Score {success_score}")
-    return candidates
+async def _fetch_quotes_for_vendor(active_client: Any, vendor_id: str) -> List[Dict[str, Any]]:
+    response = (
+        active_client.table("vendor_quotes").select("*").eq("vendor_id", vendor_id)
+        .order("created_at", desc=True).execute()
+    )
+    return getattr(response, "data", None) or []
 
 
 async def build_procurement_context(
@@ -118,131 +123,139 @@ async def build_procurement_context(
     vendor_id: Optional[str] = None,
     client: Any = None,
 ) -> Dict[str, Any]:
-    """Build a complete procurement context object from existing procurement pipeline data."""
+    """Build current procurement context, including all current vendor quotes when needed."""
     active_client = client or (supabase_service or supabase)
-    if not procurement_id and not quote_id and not vendor_id:
-        raise ValueError("A procurement_id, quote_id, or vendor_id is required to build negotiation context.")
+    if not any([procurement_id, quote_id, vendor_id]):
+        raise ValueError("Provide procurement_id, quote_id, or vendor_id.")
 
-    procurement = {}
-    vendor = {}
-    quote = {}
-    contract = {}
-    risk_row = {}
-
+    procurement: Dict[str, Any] = {}
     if procurement_id:
-        procurement_resp = active_client.table("procurements").select("*").eq("id", procurement_id).execute()
-        procurement_rows = procurement_resp.data if getattr(procurement_resp, "data", None) else []
-        if procurement_rows:
-            procurement = procurement_rows[0]
+        response = active_client.table("procurements").select("*").eq("id", procurement_id).limit(1).execute()
+        rows = getattr(response, "data", None) or []
+        if rows:
+            procurement = rows[0]
+
+    # Resolve an explicitly requested quote first.
+    selected_quote: Dict[str, Any] = {}
+    selected_vendor: Dict[str, Any] = {}
+
+    if quote_id:
+        response = active_client.table("vendor_quotes").select("*").eq("id", quote_id).limit(1).execute()
+        rows = getattr(response, "data", None) or []
+        if not rows:
+            raise ValueError(f"No quote found for quote_id={quote_id}.")
+        selected_quote = rows[0]
+        vendor_id = vendor_id or _text(selected_quote.get("vendor_id"))
 
     if vendor_id:
-        vendor_resp = active_client.table("vendors").select("*").eq("id", vendor_id).execute()
-        vendor_rows = vendor_resp.data if getattr(vendor_resp, "data", None) else []
-        if vendor_rows:
-            vendor = vendor_rows[0]
+        response = active_client.table("vendors").select("*").eq("id", vendor_id).limit(1).execute()
+        rows = getattr(response, "data", None) or []
+        if not rows:
+            raise ValueError(f"No vendor found for vendor_id={vendor_id}.")
+        selected_vendor = rows[0]
 
-    if not vendor and quote_id:
-        quote_resp = active_client.table("vendor_quotes").select("*").eq("id", quote_id).execute()
-        quote_rows = quote_resp.data if getattr(quote_resp, "data", None) else []
-        if quote_rows:
-            quote = quote_rows[0]
-            resolved_quote_vendor_id = quote.get("vendor_id")
-            if resolved_quote_vendor_id:
-                vendor_resp = active_client.table("vendors").select("*").eq("id", resolved_quote_vendor_id).execute()
-                vendor_rows = vendor_resp.data if getattr(vendor_resp, "data", None) else []
-                if vendor_rows:
-                    vendor = vendor_rows[0]
+        if selected_quote and _text(selected_quote.get("vendor_id")) != _text(selected_vendor.get("id")):
+            raise ValueError("The supplied quote_id does not belong to the supplied vendor_id.")
 
-    if not vendor and procurement_id:
-        vendor_resp = active_client.table("vendors").select("*").eq("procurement_id", procurement_id).execute()
-        vendor_rows = vendor_resp.data if getattr(vendor_resp, "data", None) else []
-        if vendor_rows:
-            vendor = vendor_rows[0]
-            if len(vendor_rows) > 1:
-                selected_vendor = next(
-                    (row for row in vendor_rows if _normalize_text(row.get("vendor_name"))),
-                    vendor_rows[0],
-                )
-                vendor = selected_vendor
+    vendors = await _fetch_vendors(active_client, procurement_id)
+    vendor_by_id = {_text(v.get("id")): v for v in vendors if _text(v.get("id"))}
+    if selected_vendor:
+        vendor_by_id[_text(selected_vendor.get("id"))] = selected_vendor
 
-    if not vendor:
-        raise ValueError("No vendor record found for the provided procurement_id, quote_id, or vendor_id")
+    # A vendor can be supplied without procurement_id. In that case it is still valid.
+    if selected_vendor and not vendors:
+        vendors = [selected_vendor]
 
-    resolved_vendor_id = vendor.get("id") or quote.get("vendor_id")
-    if not resolved_vendor_id:
-        raise ValueError("No vendor_id could be resolved from the vendor record")
+    candidate_quotes: List[Dict[str, Any]] = []
+    if selected_quote:
+        candidate_quotes.append(_quote_summary(selected_quote, selected_vendor))
+    elif vendor_id:
+        quotes = await _fetch_quotes_for_vendor(active_client, _text(vendor_id))
+        if quotes:
+            candidate_quotes.append(_quote_summary(quotes[0], selected_vendor))
+    else:
+        # Procurement-only requests: use the latest quote from EVERY vendor.
+        for vendor in vendors:
+            vid = _text(vendor.get("id"))
+            if not vid:
+                continue
+            quotes = await _fetch_quotes_for_vendor(active_client, vid)
+            if quotes:
+                candidate_quotes.append(_quote_summary(quotes[0], vendor))
 
-    if not _normalize_text(vendor.get("vendor_name")):
-        raise ValueError(f"Vendor record {resolved_vendor_id} is missing a vendor_name")
+    if not candidate_quotes:
+        raise ValueError("No current vendor quotes were found for this procurement.")
 
-    quote_resp = active_client.table("vendor_quotes").select("*").eq("vendor_id", resolved_vendor_id).execute()
-    quote_rows = quote_resp.data if getattr(quote_resp, "data", None) else []
-    if not quote_rows:
-        raise ValueError(f"No quote record found for vendor_id {resolved_vendor_id}")
-    quote = quote_rows[0]
+    # For a procurement-only request there is deliberately no arbitrary target vendor.
+    target_vendor = selected_vendor or (vendor_by_id.get(_text(candidate_quotes[0].get("vendor_id"))) if len(candidate_quotes) == 1 else {})
+    target_quote = selected_quote if selected_quote else (candidate_quotes[0] if len(candidate_quotes) == 1 else {})
+    target_vendor_id = _text(target_vendor.get("id")) or (_text(candidate_quotes[0].get("vendor_id")) if len(candidate_quotes) == 1 else "")
 
-    contract_resp = active_client.table("contracts").select("*").eq("vendor_id", resolved_vendor_id).execute()
-    contract_rows = contract_resp.data if getattr(contract_resp, "data", None) else []
-    if not contract_rows:
-        raise ValueError(f"No contract record found for vendor_id {resolved_vendor_id}")
-    contract = contract_rows[0]
+    title = procurement.get("title") or procurement.get("description") or ""
+    category = procurement.get("category") or ""
+    department = procurement.get("department") or procurement.get("dept") or procurement.get("business_unit") or ""
 
-    risk_resp = active_client.table("vendor_risk_analysis").select("*").eq("vendor_id", resolved_vendor_id).execute()
-    risk_rows = risk_resp.data if getattr(risk_resp, "data", None) else []
-    if not risk_rows:
-        raise ValueError(f"No vendor risk analysis found for vendor_id {resolved_vendor_id}")
-    risk_row = risk_rows[0]
+    # Fetch contract/risk for all candidates. This lets the agent compare vendors when
+    # procurement_id alone is supplied.
+    candidate_details: List[Dict[str, Any]] = []
+    for candidate in candidate_quotes:
+        vid = _text(candidate.get("vendor_id"))
+        vendor = vendor_by_id.get(vid, {})
+        contracts_response = (
+            active_client.table("contracts").select("*").eq("vendor_id", vid)
+            .order("created_at", desc=True).limit(1).execute()
+        )
+        contracts = getattr(contracts_response, "data", None) or []
+        risk_response = (
+            active_client.table("vendor_risk_analysis").select("*").eq("vendor_id", vid)
+            .order("created_at", desc=True).limit(1).execute()
+        )
+        risks = getattr(risk_response, "data", None) or []
+        candidate_details.append({
+            **candidate,
+            "contact_person": vendor.get("contact_person"),
+            "email": vendor.get("email"),
+            "country": vendor.get("country"),
+            "contract": contracts[0] if contracts else {},
+            "risk": risks[0] if risks else {},
+        })
 
-    quote_value = _safe_float(quote.get("price") or quote.get("price_usd") or quote.get("normalized_price"), 0.0)
-    delivery_days = _safe_int(quote.get("delivery_days"), 0)
-    warranty = _safe_float(quote.get("warranty_years") or quote.get("warranty") or quote.get("warranty_period"), 0.0)
-    compliance = _safe_float(quote.get("compliance_score"), 0.0)
-
-    contract_information = {
-        "contract_name": contract.get("contract_name") or quote.get("contract_name"),
-        "start_date": contract.get("start_date"),
-        "end_date": contract.get("end_date"),
-        "renewal_date": contract.get("renewal_date"),
-        "auto_renewal": contract.get("auto_renewal"),
-        "notice_period_days": contract.get("notice_period_days"),
-        "payment_terms": contract.get("payment_terms") or quote.get("payment_terms"),
-        "support_details": contract.get("support_details") or quote.get("support_level"),
-    }
-
-    risk_information = {
-        "vendor_id": resolved_vendor_id,
-        "risk_score": risk_row.get("overall_risk_score") or risk_row.get("risk_score"),
-        "risk_level": risk_row.get("risk_level") or risk_row.get("final_risk_level"),
-        "alerts": risk_row.get("alerts") or [],
-        "prediction_reason": risk_row.get("prediction_reason"),
-        "delay_probability": risk_row.get("delay_probability"),
-    }
+    target_contract = {}
+    target_risk = {}
+    if target_vendor_id:
+        for candidate in candidate_details:
+            if _text(candidate.get("vendor_id")) == target_vendor_id:
+                target_contract = candidate.get("contract") or {}
+                target_risk = candidate.get("risk") or {}
+                break
 
     return {
-        "procurement_id": procurement_id,
-        "quote_id": quote_id,
-        "vendor_id": resolved_vendor_id,
-        "vendor_name": vendor.get("vendor_name"),
-        "contact_person": vendor.get("contact_person"),
-        "email": vendor.get("email"),
-        "phone": vendor.get("phone"),
-        "country": vendor.get("country"),
-        "procurement_title": procurement.get("title"),
-        "department": procurement.get("department") or procurement.get("dept") or procurement.get("business_unit") or procurement.get("team"),
-        "product_category": procurement.get("category") or procurement.get("title") or "Unknown Category",
-        "quoted_price": quote_value,
-        "quote_value": quote_value,
-        "delivery_days": delivery_days if delivery_days > 0 else None,
-        "warranty": warranty if warranty > 0 else None,
-        "support_details": contract_information.get("support_details") or quote.get("support_level"),
-        "support_level": quote.get("support_level") or contract_information.get("support_details"),
-        "payment_terms": quote.get("payment_terms") or contract_information.get("payment_terms"),
-        "compliance": compliance if compliance > 0 else None,
-        "compliance_score": compliance if compliance > 0 else None,
-        "contract_information": contract_information,
-        "risk_information": risk_information,
-        "risk_score": risk_information.get("risk_score"),
-        "vendor_rank": None,
+        "procurement_id": procurement_id or selected_quote.get("procurement_id"),
+        "quote_id": _text(target_quote.get("quote_id") or target_quote.get("id")) or None,
+        "vendor_id": target_vendor_id or None,
+        "vendor_name": _text(target_vendor.get("vendor_name")) or None,
+        "contact_person": target_vendor.get("contact_person"),
+        "email": target_vendor.get("email"),
+        "phone": target_vendor.get("phone"),
+        "country": target_vendor.get("country"),
+        "procurement_title": title,
+        "product_family": title,
+        "department": department,
+        "product_category": category,
+        "quote_value": _safe_float(target_quote.get("quote_value")),
+        "quoted_price": _safe_float(target_quote.get("quote_value")),
+        "delivery_days": target_quote.get("delivery_days"),
+        "warranty": target_quote.get("warranty_years"),
+        "payment_terms": target_quote.get("payment_terms"),
+        "support_level": target_quote.get("support_level"),
+        "compliance": target_quote.get("compliance_score"),
+        "compliance_score": target_quote.get("compliance_score"),
+        "quote_information": target_quote,
+        "candidate_quotes": candidate_details,
+        "contract_information": target_contract,
+        "risk_information": target_risk,
+        "risk_score": target_risk.get("overall_risk_score") or target_risk.get("risk_score"),
+        "multi_vendor_procurement": len(candidate_details) > 1,
     }
 
 
@@ -253,127 +266,25 @@ async def retrieve_similar_negotiations(
     quote_value: Optional[float] = None,
     client: Any = None,
 ) -> List[NegotiationHistoryRecord]:
-    """Retrieve the highest-ranked historical negotiation cases from negotiation_history."""
-    active_client = client or (supabase_service or supabase)
+    context = dict(procurement_context or {})
+    if vendor_name and not context.get("vendor_name"):
+        context["vendor_name"] = vendor_name
+    if product_category and not context.get("product_category"):
+        context["product_category"] = product_category
+    if quote_value is not None and context.get("quote_value") is None:
+        context["quote_value"] = quote_value
+    if not context:
+        raise ValueError("Procurement context is required for RAG retrieval.")
 
-    current_context = procurement_context or {}
-    vendor_name = current_context.get("vendor_name") or vendor_name
-    product_category = current_context.get("product_category") or current_context.get("procurement_title") or product_category
-    quote_value = current_context.get("quote_value") or current_context.get("quoted_price") or quote_value
-    vendor_id = current_context.get("vendor_id")
-    department = current_context.get("department") or current_context.get("procurement_department")
-
-    try:
-        query = active_client.table("negotiation_history").select("*")
-        if product_category and product_category != "Unknown Category":
-            query = query.eq("product_category", product_category)
-        resp = query.execute()
-        rows = resp.data if getattr(resp, "data", None) else []
-        if not rows and product_category and product_category != "Unknown Category":
-            fallback_resp = active_client.table("negotiation_history").select("*").execute()
-            rows = fallback_resp.data if getattr(fallback_resp, "data", None) else []
-
-        if not rows:
-            return []
-
-        vendor_lookup: Dict[str, str] = {}
-        vendor_ids = [str(row.get("vendor_id")) for row in rows if row.get("vendor_id")]
-        seen_vendor_ids = set()
-        for vendor_id_value in vendor_ids:
-            if vendor_id_value in seen_vendor_ids:
-                continue
-            seen_vendor_ids.add(vendor_id_value)
-            try:
-                vendor_resp = active_client.table("vendors").select("*").eq("id", vendor_id_value).execute()
-                vendor_rows = getattr(vendor_resp, "data", None) or []
-                if vendor_rows:
-                    vendor_name_value = str(vendor_rows[0].get("vendor_name") or "").strip()
-                    if vendor_name_value:
-                        vendor_lookup[vendor_id_value] = vendor_name_value
-            except Exception:
-                continue
-
-        normalized_rows = []
-        for row in rows:
-            normalized_row = dict(row)
-            if _normalize_optional_bool(normalized_row.get("is_baseline")):
-                continue
-            vendor_id_value = normalized_row.get("vendor_id")
-            if not normalized_row.get("vendor_name") and vendor_id_value:
-                resolved_vendor_name = vendor_lookup.get(str(vendor_id_value))
-                if resolved_vendor_name:
-                    normalized_row["vendor_name"] = resolved_vendor_name
-            normalized_rows.append(normalized_row)
-
-        records: List[NegotiationHistoryRecord] = [NegotiationHistoryRecord.model_validate(row) for row in normalized_rows]
-
-        scored = []
-        for record in records:
-            score = 0.0
-            record_department = None
-            if isinstance(record, NegotiationHistoryRecord):
-                record_department = None
-            else:
-                record_department = None
-
-            if product_category and record.product_category:
-                score += _text_similarity(product_category, record.product_category) * CATEGORY_MATCH_WEIGHT
-            else:
-                score += 0.0
-
-            if department:
-                record_department = None
-                if hasattr(record, "model_dump"):
-                    record_department = None
-                raw_department = getattr(record, "department", None)
-                if raw_department is None:
-                    raw_department = getattr(record, "procurement_department", None)
-                if raw_department:
-                    record_department = raw_department
-                if record_department:
-                    score += _text_similarity(department, record_department) * DEPARTMENT_MATCH_WEIGHT
-
-            score += _value_similarity(quote_value, record.initial_quote_value) * QUOTE_SIMILARITY_WEIGHT
-
-            success_score = record.success_score or 0
-            try:
-                ss = float(success_score)
-            except Exception:
-                ss = 0.0
-            score += ss * SUCCESS_SCORE_WEIGHT
-
-            outcome = (record.outcome or "").lower()
-            if outcome in ["success", "successful", "won"]:
-                score += OUTCOME_WEIGHT
-
-            try:
-                rounds = int(record.negotiation_rounds or 0)
-                if rounds <= 2 and rounds > 0:
-                    score += EFFICIENCY_WEIGHT
-            except Exception:
-                pass
-
-            if record.discount_received is not None:
-                score += max(0.0, 1.0 - min(abs(_safe_float(record.discount_received) / 100.0), 1.0)) * 2.0
-
-            if record.strategy_used:
-                score += 1.0
-
-            if vendor_id and record.vendor_id and str(vendor_id) == str(record.vendor_id):
-                score += VENDOR_MATCH_WEIGHT
-            elif record.vendor_name and vendor_name and record.vendor_name.lower() == vendor_name.lower():
-                score += VENDOR_MATCH_WEIGHT
-            else:
-                score += _text_similarity(vendor_name, record.vendor_name) * VENDOR_MATCH_WEIGHT * 0.2
-
-            scored.append((score, record))
-
-        scored.sort(key=lambda x: x[0], reverse=True)
-        top = [item[1] for item in scored[:5]]
-        return top
-
-    except Exception as e:
-        raise Exception(f"Failed to retrieve negotiations: {str(e)}")
+    rows = await retrieve_rag_evidence(context, limit=12, client=client)
+    records: List[NegotiationHistoryRecord] = []
+    for row in rows:
+        clean = {k: v for k, v in row.items() if not k.startswith("_")}
+        try:
+            records.append(NegotiationHistoryRecord.model_validate(clean))
+        except Exception:
+            continue
+    return records
 
 
 async def generate_strategy(
@@ -386,102 +297,63 @@ async def generate_strategy(
     procurement_context: Optional[Dict[str, Any]] = None,
     client: Any = None,
 ) -> NegotiationStrategyResult:
-    """Retrieve similar negotiations and call the negotiation strategy agent."""
+    active_client = client or (supabase_service or supabase)
     try:
-        current_context = procurement_context
-        if not current_context:
-            try:
-                current_context = await build_procurement_context(
-                    procurement_id=procurement_id,
-                    quote_id=quote_id,
-                    vendor_id=vendor_id,
-                    client=client,
-                )
-            except Exception as context_error:
-                current_context = {
-                    "vendor_name": vendor_name or "Unknown Vendor",
-                    "product_category": product_category or "Unknown Category",
-                    "quote_value": quote_value,
-                    "procurement_id": procurement_id,
-                    "quote_id": quote_id,
-                    "vendor_id": vendor_id,
-                    "department": None,
-                    "error": str(context_error),
-                }
-
-        if not current_context.get("product_category") and product_category:
-            current_context["product_category"] = product_category
-        if not current_context.get("quote_value") and quote_value is not None:
-            current_context["quote_value"] = quote_value
-        if not current_context.get("vendor_name") and vendor_name:
-            current_context["vendor_name"] = vendor_name
-
-        historical = await retrieve_similar_negotiations(current_context, client=client)
-
-        prompt_context = {
-            "current_procurement_context": current_context,
-            "historical_negotiations": [_format_negotiation_context(record) for record in historical],
-        }
-        if not historical:
-            prompt_context["historical_negotiations"] = [
-                "No historical negotiation records were found for the current category, so the strategy is based on the current procurement context only."
-            ]
-        historical_context = [_format_negotiation_context(record) for record in historical]
-        strategy_dict = generate_negotiation_strategy(prompt_context, historical_context)
-        strategy = NegotiationStrategy.model_validate(strategy_dict)
-        result = NegotiationStrategyResult(
-            status="success",
-            strategy=strategy,
-            historical=historical,
+        context = procurement_context or await build_procurement_context(
+            procurement_id=procurement_id,
+            quote_id=quote_id,
+            vendor_id=vendor_id,
+            client=active_client,
         )
+
+        if vendor_name and not context.get("vendor_name"):
+            context["vendor_name"] = vendor_name
+        if product_category and not context.get("product_category"):
+            context["product_category"] = product_category
+        if quote_value is not None and context.get("quote_value") is None:
+            context["quote_value"] = quote_value
+
+        strategy_dict = await generate_negotiation_strategy(context)
+        historical_rows = strategy_dict.pop("_historical_records", [])
+        historical: List[NegotiationHistoryRecord] = []
+        for row in historical_rows:
+            clean = {k: v for k, v in row.items() if not k.startswith("_")}
+            try:
+                historical.append(NegotiationHistoryRecord.model_validate(clean))
+            except Exception:
+                continue
+
+        strategy = NegotiationStrategy.model_validate(strategy_dict)
+        result = NegotiationStrategyResult(status="success", strategy=strategy, historical=historical)
 
         trace = negotiation_agent_module.get_last_strategy_trace()
-        if trace.get("used_fallback"):
-            await log_agent_execution(
-                agent_name="Negotiation Strategy Agent",
-                action_type="generate_strategy_failure",
-                input_payload={
-                    "procurement_id": procurement_id,
-                    "quote_id": quote_id,
-                    "current_context": current_context,
-                    "retrieved_records_count": len(historical),
-                    "top_strategy_candidates": _build_strategy_candidates(historical),
-                    "raw_llm_response": trace.get("raw_llm_response", ""),
-                    "cleaned_response": trace.get("cleaned_response", ""),
-                    "fallback_reason": trace.get("fallback_reason", ""),
-                },
-                output_payload=json.loads(result.model_dump_json()),
-                reasoning=f"Fallback strategy used because {trace.get('fallback_reason', 'the model response was invalid')}.",
-            )
-
         await log_agent_execution(
             agent_name="Negotiation Strategy Agent",
-            action_type="generate_strategy",
+            action_type="generate_strategy_fallback" if trace.get("used_fallback") else "generate_strategy",
             input_payload={
-                "procurement_id": procurement_id,
-                "quote_id": quote_id,
-                "current_context": current_context,
-                "retrieved_records_count": len(historical),
-                "top_strategy_candidates": _build_strategy_candidates(historical),
+                "procurement_id": context.get("procurement_id"),
+                "quote_id": context.get("quote_id"),
+                "vendor_id": context.get("vendor_id"),
+                "vendor_name": context.get("vendor_name"),
+                "product_family": context.get("product_family"),
+                "product_category": context.get("product_category"),
+                "candidate_quote_count": len(context.get("candidate_quotes") or []),
+                "retrieved_records": len(historical),
+                "tool_calls": trace.get("tool_calls", []),
             },
-            output_payload=json.loads(result.model_dump_json()),
-            reasoning="Generated negotiation strategy based on structured historical procurement patterns."
+            output_payload=result.model_dump(),
+            reasoning="Autonomous procurement RAG negotiation analysis completed.",
         )
-
         return result
-    except Exception as e:
-        fallback_strategy = NegotiationStrategy.model_validate({
-            "recommended_strategy": "Leverage cross-department volume, commercial benchmarking, and standardized contract terms to achieve targeted pricing alignment.",
-            "expected_discount_range": "5% - 10%",
-            "confidence_score": 70,
-            "reasoning": f"A safe fallback strategy was used because the negotiation workflow encountered an error: {str(e)}",
-            "risks": ["Vendor may resist pricing adjustments", "Commercial review may require escalation"],
-        })
-        return NegotiationStrategyResult(
-            status="success",
-            strategy=fallback_strategy,
-            historical=[],
+    except Exception as exc:
+        fallback = NegotiationStrategy(
+            recommended_strategy="Review the available procurement evidence before committing to a negotiation position.",
+            expected_discount_range="Evidence unavailable",
+            confidence_score=15.0,
+            reasoning=f"The negotiation workflow could not complete reliably: {exc}",
+            risks=["Insufficient or unavailable evidence", "Human procurement review required"],
         )
+        return NegotiationStrategyResult(status="error", strategy=fallback, historical=[])
 
 
 async def generate_email(
@@ -494,70 +366,111 @@ async def generate_email(
     procurement_context: Optional[Dict[str, Any]] = None,
     client: Any = None,
 ) -> NegotiationEmail:
-    """Call the email generator agent and log the result."""
+    """
+    Generate the real vendor-facing negotiation email.
+
+    IMPORTANT:
+    There is intentionally NO hard-coded email fallback here.
+    If the LLM fails, the actual error is raised instead of silently
+    returning the old "Dear Vendor / Our proposed approach..." template.
+    """
+
+    context = procurement_context or await build_procurement_context(
+        procurement_id=procurement_id,
+        quote_id=quote_id,
+        vendor_id=vendor_id,
+        client=client,
+    )
+
+    # Prefer the actual vendor resolved from Supabase.
+    resolved_vendor = (
+        context.get("vendor_name")
+        or vendor_name
+        or "Vendor"
+    )
+
     try:
-        current_context = procurement_context
-        if not current_context:
-            current_context = await build_procurement_context(
-                procurement_id=procurement_id,
-                quote_id=quote_id,
-                vendor_id=vendor_id,
-                client=client,
+        email_result = await generate_negotiation_email(
+            vendor_name=resolved_vendor,
+            recommended_strategy=recommended_strategy,
+            expected_discount=expected_discount_range,
+            procurement_id=procurement_id,
+            quote_id=quote_id,
+            vendor_id=vendor_id,
+        )
+
+        # Agent already returns NegotiationEmail in the normal path,
+        # but validation keeps the service boundary safe.
+        if isinstance(email_result, NegotiationEmail):
+            result = email_result
+        else:
+            result = NegotiationEmail.model_validate(email_result)
+
+        # Verify that the result is actually vendor-facing and does not
+        # contain the internal fallback wording.
+        combined = f"{result.subject}\n{result.body}".lower()
+
+        forbidden_internal_phrases = [
+            "our proposed approach is",
+            "our strategy is",
+            "recommended strategy",
+            "evidence-supported",
+            "evidence supported",
+            "target range",
+            "rag",
+            "confidence score",
+            "success score",
+            "historical evidence",
+            "internal strategy",
+            "ai agent",
+        ]
+
+        leaked = [
+            phrase
+            for phrase in forbidden_internal_phrases
+            if phrase in combined
+        ]
+
+        if leaked:
+            raise RuntimeError(
+                "LLM generated an internal-facing email instead of a "
+                "vendor-facing email. Forbidden content: "
+                + ", ".join(leaked)
             )
-        resolved_vendor = current_context.get("vendor_name") or vendor_name or "Vendor"
-        email_dict = generate_negotiation_email(
+
+        placeholder_values = [
+            "[vendor name]",
+            "[company name]",
+            "[project name]",
+            "[requirement name]",
+            "[your name]",
+        ]
+
+        placeholders = [
+            value for value in placeholder_values
+            if value in combined
+        ]
+
+        if placeholders:
+            raise RuntimeError(
+                "LLM generated an email containing placeholders: "
+                + ", ".join(placeholders)
+            )
+
+        return result
+
+    except Exception as exc:
+        logger.exception(
+            "REAL negotiation email generation failed for vendor=%s",
             resolved_vendor,
-            recommended_strategy,
-            expected_discount_range,
-        )
-        email = NegotiationEmail.model_validate(email_dict)
-
-        trace = negotiation_agent_module.get_last_email_trace()
-        if trace.get("used_fallback"):
-            await log_agent_execution(
-                agent_name="Negotiation Strategy Agent",
-                action_type="generate_email_failure",
-                input_payload={
-                    "procurement_id": procurement_id,
-                    "quote_id": quote_id,
-                    "vendor_name": resolved_vendor,
-                    "recommended_strategy": recommended_strategy,
-                    "expected_discount_range": expected_discount_range,
-                    "raw_llm_response": trace.get("raw_llm_response", ""),
-                    "cleaned_response": trace.get("cleaned_response", ""),
-                    "fallback_reason": trace.get("fallback_reason", ""),
-                },
-                output_payload=email.model_dump(),
-                reasoning=f"Fallback email used because {trace.get('fallback_reason', 'the model response was invalid')}.",
-            )
-
-        await log_agent_execution(
-            agent_name="Negotiation Strategy Agent",
-            action_type="generate_email",
-            input_payload={
-                "procurement_id": procurement_id,
-                "quote_id": quote_id,
-                "vendor_name": resolved_vendor,
-                "recommended_strategy": recommended_strategy,
-                "expected_discount_range": expected_discount_range,
-            },
-            output_payload=email.model_dump(),
-            reasoning="Generated procurement negotiation outreach email based on the recommended negotiation strategy."
         )
 
-        return email
-    except Exception as e:
-        fallback_email = NegotiationEmail.model_validate({
-            "subject": "Commercial Proposal Review Request",
-            "body": (
-                f"Dear {vendor_name or 'Vendor'},\n\n"
-                "We would like to discuss the commercial terms of the current proposal and explore opportunities for improved pricing and value. "
-                f"Our proposed approach is to {recommended_strategy or 'review the proposal in detail'} with a target discount range of {expected_discount_range or '5% - 10%'}. "
-                "We value the relationship and believe there is an opportunity to align on a mutually beneficial outcome.\n\n"
-                "Regards,\nProcurement Team"
-            ),
-        })
-        return fallback_email
+        # Do NOT return a hard-coded email.
+        # The frontend/API must receive the real failure so the underlying
+        # Groq/LLM problem can be diagnosed and fixed.
+        raise RuntimeError(
+            f"Negotiation email generation failed: {str(exc)}"
+        ) from exc
 
 
 async def save_accepted_negotiation(
@@ -572,70 +485,43 @@ async def save_accepted_negotiation(
     procurement_context: Optional[Dict[str, Any]] = None,
     client: Any = None,
 ) -> Dict[str, Any]:
-    """Persist an accepted negotiation strategy as organizational procurement knowledge."""
     active_client = client or (supabase_service or supabase)
-    current_context = procurement_context or await build_procurement_context(
+    context = procurement_context or await build_procurement_context(
         procurement_id=procurement_id,
         quote_id=quote_id,
         vendor_id=vendor_id,
         client=active_client,
     )
 
-    email_payload = generated_email or {}
-    reasoning_text = ""
-    if isinstance(email_payload, dict):
-        reasoning_text = email_payload.get("body") or ""
-
     record = {
-        "procurement_id": current_context.get("procurement_id") or procurement_id,
-        "vendor_id": current_context.get("vendor_id"),
-        "vendor_name": current_context.get("vendor_name"),
-        "product_category": current_context.get("product_category"),
-        "initial_quote_value": current_context.get("quote_value") or current_context.get("quoted_price"),
-        "delivery_days": current_context.get("delivery_days"),
-        "payment_terms": current_context.get("payment_terms"),
-        "warranty_years": current_context.get("warranty"),
-        "support_level": current_context.get("support_level") or current_context.get("support_details"),
-        "compliance_score": current_context.get("compliance") or current_context.get("compliance_score"),
-        "risk_score": risk_score if risk_score is not None else current_context.get("risk_score"),
-        "vendor_rank": vendor_rank,
-        "recommended_strategy": recommended_strategy,
-        "expected_discount_range": expected_discount_range,
-        "generated_email": email_payload,
-        "reasoning": reasoning_text,
-        "confidence_score": None,
+        "vendor_id": context.get("vendor_id"),
+        "vendor_name": context.get("vendor_name"),
+        "product_category": context.get("product_category"),
+        "initial_quote_value": context.get("quote_value"),
         "strategy_used": recommended_strategy,
+        "negotiation_date": datetime.utcnow().date().isoformat(),
         "outcome": "accepted",
-        "status": "accepted",
         "negotiation_status": "accepted",
+        "generated_email": generated_email or {},
+        "reasoning": "Human approved the AI-generated negotiation strategy for use.",
+        "confidence_score": None,
         "user_approved": True,
         "is_baseline": False,
-        "notes": "Accepted via negotiation workflow",
-        "negotiation_date": datetime.utcnow().date().isoformat(),
-        "created_at": datetime.utcnow().isoformat(),
-        "success_score": 100,
+        "notes": "Accepted via negotiation workflow. Actual commercial outcome is not yet known.",
+        "success_score": None,
+        "discount_requested": None,
+        "discount_received": None,
+        "final_negotiated_value": None,
+        "negotiation_rounds": None,
     }
 
-    try:
-        response = active_client.table("negotiation_history").insert(record).execute()
-        if not getattr(response, "data", None):
-            raise Exception("No negotiation record returned from insert")
-        return {"status": "success", "record_id": response.data[0].get("id")}
-    except Exception as exc:
-        try:
-            fallback_record = {
-                "vendor_id": current_context.get("vendor_id"),
-                "vendor_name": current_context.get("vendor_name"),
-                "product_category": current_context.get("product_category"),
-                "initial_quote_value": current_context.get("quote_value"),
-                "strategy_used": recommended_strategy,
-                "outcome": "accepted",
-                "notes": "Accepted via negotiation workflow",
-                "negotiation_date": datetime.utcnow().date().isoformat(),
-            }
-            response = active_client.table("negotiation_history").insert(fallback_record).execute()
-            if not getattr(response, "data", None):
-                raise Exception("Fallback insert failed")
-            return {"status": "success", "record_id": response.data[0].get("id"), "fallback": True}
-        except Exception as fallback_error:
-            raise Exception(f"Failed to save accepted negotiation strategy: {exc} | {fallback_error}")
+    response = active_client.table("negotiation_history").insert(record).execute()
+    data = getattr(response, "data", None) or []
+    if not data:
+        raise RuntimeError("Negotiation approval could not be saved.")
+
+    return {
+        "status": "success",
+        "record_id": data[0].get("id"),
+        "message": "Strategy approval saved. It will not be treated as a successful negotiation until an actual commercial outcome is recorded.",
+    }
