@@ -26,7 +26,7 @@ def _set_cache(key: str, value: Any):
     _CACHE[key] = (time.time(), value)
 
 
-def _get_llm() -> ChatGroq | None:
+def _get_llm(max_tokens: int = 3500) -> ChatGroq | None:
     key = get_next_groq_key()
     if not key:
         return None
@@ -35,11 +35,44 @@ def _get_llm() -> ChatGroq | None:
             api_key=key,
             model="llama-3.1-8b-instant",
             temperature=0.2,
-            max_tokens=1024
+            max_tokens=max_tokens
         )
     except Exception as e:
         logger.warning(f"Unable to initialize ChatGroq LLM: {e}")
         return None
+
+
+def _clean_and_parse_json_list(text: str) -> List[Dict[str, Any]]:
+    """Clean and robustly parse JSON list even if partially truncated."""
+    content = text.strip()
+    if "```" in content:
+        content = content.replace("```json", "").replace("```", "").strip()
+
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, list):
+            return parsed
+    except Exception:
+        pass
+
+    # Fallback: attempt to find and extract json array or repair partial array
+    import re
+    array_match = re.search(r'\[\s*\{.*\}\s*\]', content, re.DOTALL)
+    if array_match:
+        try:
+            return json.loads(array_match.group(0))
+        except Exception:
+            pass
+
+    # Partial recovery of completed objects in array
+    objects = []
+    for obj_match in re.finditer(r'\{\s*"contract_id"[^}]+\}', content):
+        try:
+            obj = json.loads(obj_match.group(0))
+            objects.append(obj)
+        except Exception:
+            continue
+    return objects
 
 
 async def enrich_renewal_analyses_with_llm(analyses: List[RenewalRiskAnalysis]) -> List[RenewalRiskAnalysis]:
@@ -57,7 +90,7 @@ async def enrich_renewal_analyses_with_llm(analyses: List[RenewalRiskAnalysis]) 
     if cached:
         return cached
 
-    llm = _get_llm()
+    llm = _get_llm(max_tokens=3500)
     if not llm:
         return analyses
 
@@ -86,7 +119,7 @@ For EACH contract in the list, write:
 
 CRITICAL DIVERSITY RULE TO PREVENT REPETITIVENESS:
 - NEVER repeat identical sentence structures, prefixes, or boilerplate phrases across contracts.
-- VARY YOUR VERBS: Use a completely different action verb for each item (e.g. "Execute", "Audit", "Consolidate", "Renegotiate", "Transition", "Re-align", "Sanction", "Migrate").
+- VARY YOUR VERBS: Use a completely different action verb for each item (e.g. "Execute emergency extension", "Audit pricing tiers", "Consolidate into master MSA", "Renegotiate support rates", "Transition to alternate vendor", "Re-align SLA thresholds", "Benchmarking terms", "Finalize renewal schedule").
 - Explicitly mention the specific contract name, vendor name, and exact days_remaining in every recommendation so that each recommendation is uniquely tailored to that contract!
 
 STRICT RULES TO PREVENT HALLUCINATION:
@@ -105,14 +138,12 @@ STRICT RULES TO PREVENT HALLUCINATION:
     try:
         response = await asyncio.wait_for(
             asyncio.to_thread(llm.invoke, prompt),
-            timeout=15.0
+            timeout=20.0
         )
         content = response.content.strip()
-        if "```" in content:
-            content = content.replace("```json", "").replace("```", "").strip()
-
-        parsed = json.loads(content)
-        if isinstance(parsed, list):
+        parsed = _clean_and_parse_json_list(content)
+        
+        if parsed and isinstance(parsed, list):
             parsed_map = {item.get("contract_id"): item for item in parsed if isinstance(item, dict)}
             for a in analyses:
                 if a.contract_id in parsed_map:

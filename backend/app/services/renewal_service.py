@@ -62,41 +62,74 @@ def generate_renewal_recommendation(
 ) -> str:
     """Generate distinct, highly actionable recommendations tailored to contract and vendor context based on risk level."""
     days_to_notice = days_remaining - notice_period_days
+    c_lower = (contract_name or "").lower()
 
     if days_remaining < 0:
         overdue_days = abs(days_remaining)
-        return (
-            f"Execute emergency contract extension for {contract_name} with {vendor_name} (expired {overdue_days} day{'s' if overdue_days != 1 else ''} ago) "
-            f"or evaluate alternate suppliers to eliminate out-of-contract rates."
-        )
+        if "lease" in c_lower or "hardware" in c_lower:
+            return (
+                f"Execute asset buyout or emergency lease extension for {contract_name} with {vendor_name} "
+                f"(expired {overdue_days} day{'s' if overdue_days != 1 else ''} ago) to avoid month-to-month penalty surcharges."
+            )
+        elif "support" in c_lower or "maintenance" in c_lower:
+            return (
+                f"Renegotiate critical SLA coverage for {contract_name} with {vendor_name} "
+                f"(expired {overdue_days} day{'s' if overdue_days != 1 else ''} ago) to maintain infrastructure uptime continuity."
+            )
+        elif "device" in c_lower or "supply" in c_lower:
+            return (
+                f"Audit unit pricing against current market benchmarks for {contract_name} with {vendor_name} "
+                f"(expired {overdue_days} day{'s' if overdue_days != 1 else ''} ago) and initiate supplier RFP review."
+            )
+        else:
+            return (
+                f"Execute emergency contract extension for {contract_name} with {vendor_name} "
+                f"(expired {overdue_days} day{'s' if overdue_days != 1 else ''} ago) or transition to alternate pre-qualified suppliers."
+            )
 
     if auto_renewal:
         if days_to_notice <= 0:
             overdue_notice = abs(days_to_notice)
             return (
-                f"Initiate immediate renewal negotiations for {contract_name} with {vendor_name}. Notice deadline passed {overdue_notice} day{'s' if overdue_notice != 1 else ''} ago "
-                f"({notice_period_days} days notice required); issue formal non-renewal notice to preserve leverage."
+                f"Issue formal non-renewal notice immediately for {contract_name} with {vendor_name} "
+                f"(notice deadline passed {overdue_notice} day{'s' if overdue_notice != 1 else ''} ago) to prevent forced commercial rollover."
             )
         elif days_to_notice <= 15:
             return (
-                f"Finalize commercial negotiations and prepare renewal approval for {contract_name} with {vendor_name} before notice deadline in {days_to_notice} day{'s' if days_to_notice != 1 else ''}."
+                f"Finalize commercial terms and secure renewal authorization for {contract_name} with {vendor_name} "
+                f"prior to mandatory notice cutoff in {days_to_notice} day{'s' if days_to_notice != 1 else ''}."
+            )
+        elif days_to_notice <= 45:
+            return (
+                f"Initiate preliminary contract renegotiations for {contract_name} with {vendor_name} "
+                f"ahead of notice deadline in {days_to_notice} days to lock in favorable pricing."
             )
         else:
-            return (
-                f"Schedule routine contract review and monitor vendor performance for {contract_name} with {vendor_name} ahead of notice window in {days_to_notice} days."
-            )
+            if days_to_notice > 500:
+                return (
+                    f"Benchmark long-term market pricing and align future renewal cycle for {contract_name} with {vendor_name} "
+                    f"ahead of notice window in {days_to_notice} days."
+                )
+            else:
+                return (
+                    f"Schedule routine vendor SLA performance review for {contract_name} with {vendor_name} "
+                    f"ahead of notice window in {days_to_notice} days."
+                )
     else:
         if days_remaining <= 30:
             return (
-                f"Finalize commercial negotiations and confirm vendor pricing for {contract_name} with {vendor_name} before expiration in {days_remaining} day{'s' if days_remaining != 1 else ''}."
+                f"Finalize vendor negotiations and approve commercial quote for {contract_name} with {vendor_name} "
+                f"before expiration in {days_remaining} day{'s' if days_remaining != 1 else ''}."
             )
         elif days_remaining <= 90:
             return (
-                f"Complete legal review and prepare renewal approval for {contract_name} with {vendor_name} ({days_remaining} days remaining)."
+                f"Complete legal and compliance review for {contract_name} with {vendor_name} "
+                f"({days_remaining} days remaining)."
             )
         else:
             return (
-                f"Benchmark market pricing and prepare for future renewal cycle for {contract_name} with {vendor_name} ({days_remaining} days remaining)."
+                f"Benchmark market pricing and prepare for future renewal cycle for {contract_name} with {vendor_name} "
+                f"({days_remaining} days remaining)."
             )
 
 
@@ -310,14 +343,18 @@ async def get_renewal_analysis(skip_ai: bool = False) -> Tuple[List[RenewalRiskA
     urgent_contracts = [a for a in analyses if a.risk_level in ["CRITICAL", "HIGH"]]
     if urgent_contracts:
         top_c = urgent_contracts[0]
+        vendors_affected = list(set(a.vendor_name for a in urgent_contracts if a.vendor_name))
+        vendor_str = ", ".join(vendors_affected[:3])
         audit_reasoning = (
-            f"Scanned active contract renewal windows and notice periods. "
-            f"Flagged '{top_c.contract_name}' with {top_c.vendor_name} as {top_c.risk_level} risk and issued directive to initiate immediate renegotiation before auto-renewal deadline."
+            f"Audited {len(contracts)} contracts across renewal windows and notice periods. "
+            f"Flagged {len(urgent_contracts)} high/critical risk agreements across {vendor_str} "
+            f"including '{top_c.contract_name}' ({top_c.risk_level} risk, {abs(top_c.days_remaining) if top_c.days_remaining is not None else 0}d overdue). "
+            f"Issued directive: {top_c.recommendation[:120]}..."
         )
     else:
         audit_reasoning = (
-            "Scanned active contract notice periods and renewal windows. "
-            "Confirmed all active contracts are outside critical notice deadlines and operating in good standing."
+            f"Audited {len(contracts)} active vendor contracts against notice period deadlines. "
+            f"Confirmed all agreements operate within compliant windows with 0 critical renewal risks."
         )
 
     await log_agent_execution(

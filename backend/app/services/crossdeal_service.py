@@ -317,16 +317,17 @@ async def get_crossdeal_analysis(skip_ai: bool = False) -> Tuple[List[DealOpport
 
     # Generate concise, human-readable audit-style description
     if opportunities:
-        top_vendor = opportunities[0].vendor_name
-        depts_str = " and ".join(opportunities[0].departments) if opportunities[0].departments else "multiple departments"
+        opp_summaries = [f"{o.vendor_name} ({', '.join(o.departments)}: ~${o.estimated_savings_amount:,.0f})" for o in opportunities[:3]]
+        opp_str = "; ".join(opp_summaries)
         audit_reasoning = (
-            f"Evaluated multi-department vendor procurement data across active contracts. "
-            f"Identified volume overlap for {top_vendor} across {depts_str} and recommended consolidating engagements under a Master Service Agreement."
+            f"Analyzed {len(procurements)} procurement engagements across {len(grouped)} suppliers. "
+            f"Discovered {len(opportunities)} multi-department consolidation bundles [{opp_str}] "
+            f"totaling ${total_estimated_savings:,.0f} in enterprise volume savings."
         )
     else:
         audit_reasoning = (
-            "Analyzed active vendor procurements across all enterprise departments. "
-            "Determined no multi-department vendor overlaps currently exist; single-department vendor contracts remain active."
+            f"Analyzed {len(procurements)} procurement records across all enterprise business units. "
+            f"Confirmed no multi-department supplier overlaps currently exist."
         )
 
     await log_agent_execution(
